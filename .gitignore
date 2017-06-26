@@ -1,3 +1,6 @@
+app/config.dev.js
+app/config.js
+
 ### Dependencies ###
 # Node dependencies directory
 node_modules
