@@ -1,5 +1,6 @@
 app/config.dev.js
 app/config.js
+app/log
 
 ### Dependencies ###
 # Node dependencies directory

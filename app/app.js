@@ -1,6 +1,46 @@
 "use strict";
 
 var config = require('./config');
+
+var redefineLog = function() {
+    var fs = require('fs');
+    var util = require('util');
+
+    var dir = "log";
+    if (!fs.existsSync(dir)){
+    	fs.mkdirSync(dir);
+    }	
+    var logFile = fs.createWriteStream(dir + '/skylack.log.txt', { flags: 'a' });
+    var warnFile = fs.createWriteStream(dir + '/skylack.log.warn.txt', { flags: 'a' });
+    var errFile = fs.createWriteStream(dir + '/skylack.log.err.txt', { flags: 'a' });
+    // Or 'w' to truncate the file every time the process starts.
+    var logStdout = process.stdout;
+
+    var date_str = function () {
+	return new Date().toISOString()
+		.replace(/T/, ' ')      // replace T with a space
+  		.replace(/\..+/, '') + ":  ";
+    };
+
+    console.old_log = console.log;
+    console.old_error = console.error;
+    console.old_warn = console.warn;
+
+    console.log = function () {
+      logFile.write(date_str() + util.format.apply(null, arguments) + '\n');
+      console.old_log(date_str() + util.format.apply(null, arguments));
+    }
+    console.error = function () {
+      errFile.write(date_str() + util.format.apply(null, arguments) + '\n');
+      console.old_error(date_str() + util.format.apply(null, arguments));
+    }
+    console.warn = function () {
+      warnFile.write(date_str() + util.format.apply(null, arguments) + '\n');
+      console.old_warn(date_str() + util.format.apply(null, arguments));
+    }
+  };
+redefineLog();
+
 config.integrateSlack = {};
 Object.keys(config.integrate).forEach(function (skypeName) {
 	let slackName = config.integrate[skypeName];
