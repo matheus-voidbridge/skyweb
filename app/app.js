@@ -31,10 +31,12 @@ var redefineLog = function() {
       console.old_log(date_str() + util.format.apply(null, arguments));
     }
     console.error = function () {
+      logFile.write(date_str() + util.format.apply(null, arguments) + '\n');
       errFile.write(date_str() + util.format.apply(null, arguments) + '\n');
       console.old_error(date_str() + util.format.apply(null, arguments));
     }
     console.warn = function () {
+      logFile.write(date_str() + util.format.apply(null, arguments) + '\n');
       warnFile.write(date_str() + util.format.apply(null, arguments) + '\n');
       console.old_warn(date_str() + util.format.apply(null, arguments));
     }
@@ -61,9 +63,12 @@ var RtmClient = require('@slack/client').RtmClient;
 var RTM_EVENTS = require('@slack/client').RTM_EVENTS;
 var CLIENT_EVENTS = require('@slack/client').CLIENT_EVENTS;
 var token = config.slack_ApiToken;
+var tokenMe = config.slack_MeApiToken;
 
 let channelsById = {};		// dictionary of channel names
 let channelsByName = {};	// dictionary of channel ids
+let slackSentMsg = {};
+let skypeSentMsg = {};
 
 // Skype login
 var skyweb = new Skyweb();
@@ -72,8 +77,8 @@ skyweb.login(username, password).then(function (skypeAccount) {
     //console.log('Here is some info about you:' + JSON.stringify(skyweb.skypeAccount.selfInfo, null, 2));
     //console.log('Your contacts : ' + JSON.stringify(skyweb.contactsService.contacts, null, 2));
     if (config.skypeStatus) {
-   	console.log('Skype: set status. Going to: ' + config.skypeStatus);
-	skyweb.setStatus(config.skypeStatus);
+	   	console.log('Skype: set status. Going to: ' + config.skypeStatus);
+		skyweb.setStatus(config.skypeStatus);
     }
 }).catch(function (reason) {
     console.log(reason);
@@ -83,11 +88,12 @@ skyweb.login(username, password).then(function (skypeAccount) {
 console.log('Slack: RTM init...');
 var rtm = new RtmClient(token, { logLevel: 'info' });
 rtm.start();
+var rtmMe = new RtmClient(tokenMe, { logLevel: 'info' });
+rtmMe.start();
 // The client will emit an RTM.AUTHENTICATED event on successful connection, with the `rtm.start` payload
 rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
   console.log("====== Slack Channels LIST =================== ");
   for (const c of rtmStartData.channels) {
-	//if (c.is_member && c.name ==='slakomka') { channel = c.id }
 	console.log("Channel: ", c.name, " id: ", c.id);
 	channelsById[c.id] = c.name;
 	channelsByName[c.name] = c.id;
@@ -104,9 +110,19 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
 	console.log('Slack client receive message:', message.text, "; channel_id:", message.channel, " channel:", fromChannel);
 	// resend message to skype
 	if (config.integrateSlack[fromChannel]) {
-	  let skypeConversation = "8:" + config.integrateSlack[fromChannel];
+	  let skypeName = config.integrateSlack[fromChannel];
+	  // mute skype bot sent messages
+	  if (hasMsg(slackSentMsg[fromChannel], message.text)) {
+		  console.log('Slack: mute double message sent from skype.');
+		  return;
+	  }
+	  let skypeConversation = "8:" + skypeName;
 	  console.log('Slack: redirect message to Skype :', skypeConversation);
-	  skyweb.sendMessage(skypeConversation, message.text + (config.debugSuffixSlack || ''));
+	  let msg = message.text + (config.debugSuffixSlack || '');
+	  skyweb.sendMessage(skypeConversation, msg);
+	  // store sent messages
+	  storeMsg(skypeSentMsg, skypeName, msg);
+
 
 	/*
 	  let channel = config.postAllChannel;
@@ -135,22 +151,42 @@ var sendSkypeMessage = function(skypeConversation, text) {
 // Skype message listener
 skyweb.messagesCallback = function (messages) {
     messages.forEach(function (message) {
-        if (message && message.resource && message.resource.from.indexOf(username) === -1 && message.resource.messagetype !== 'Control/Typing' && message.resource.messagetype !== 'Control/ClearTyping') {
-            var conversationLink = message.resource.conversationLink;
-            var conversationId = conversationLink.substring(conversationLink.lastIndexOf('/') + 1);
-	    var skypeName = conversationId.substring(conversationId.indexOf(':') + 1);
-	    console.log("Skype client receive message from : " + conversationId + "; message: " + message.resource.content);
+		//console.log("Skype client receive message: " + JSON.stringify(message.resource, null, 2));
+		if (message && message.resource &&message.resource.messagetype !== 'Control/Typing' && message.resource.messagetype !== 'Control/ClearTyping') {
+			var conversationLink = message.resource.conversationLink;
+			var conversationId = conversationLink.substring(conversationLink.lastIndexOf('/') + 1);
+			var skypeName = conversationId.substring(conversationId.indexOf(':') + 1);
+			if (message.resource.from.indexOf(username) === -1) {
+				console.log("Skype client receive message from : " + conversationId + "; message: " + message.resource.content);
+			
+				// resend message to slack
+				if (config.integrate[skypeName]) {
+					let slackChannel = config.integrate[skypeName];
+					console.log('Skype: redirect message to Slack :', slackChannel);
+					let msg = message.resource.content + (config.debugSuffixSkype || '');
+					rtm.sendMessage(msg, channelsByName[slackChannel]);
+					// don't store sent messages
+				}
+			} else {
+				console.log("Skype client send message to : " + conversationId + "; message: " + message.resource.content);
+				// resend self skype message to slack from `me` name
+				if (config.integrate[skypeName]) {
+					// mute slack bot sent messages
+					if (hasMsg(skypeSentMsg[skypeName], message.resource.content)) {
+					  console.log('Skype: mute double message sent from slack.');
+					  return;
+					}
 
-	    //console.log("Skype client receive message: " + JSON.stringify(message.resource, null, 2), conversationId);
-            //skyweb.sendMessage(conversationId, message.resource.content + '. Cats will rule the World');
-				
-	    // resend message to slack
-	    if (config.integrate[skypeName]) {
-		let slackChannel = config.integrate[skypeName];
-		console.log('Skype: redirect message to Slack :', slackChannel);
-		rtm.sendMessage(message.resource.content + (config.debugSuffixSkype || ''), channelsByName[slackChannel]);
-	    }
-        }
+					let slackChannel = config.integrate[skypeName];
+					console.log('Skype: write same message in Slack  :', slackChannel);					
+					let msg = message.resource.content + (config.debugSuffixSkypeMe || '');
+					rtmMe.sendMessage(msg, channelsByName[slackChannel]);
+					// store sent messages
+					storeMsg(slackSentMsg, slackChannel, msg);
+					//console.log("slackSentMsg: " + JSON.stringify(slackSentMsg, null, 2));
+				}
+			}
+		}
     });
 };
 
@@ -175,4 +211,30 @@ rtm.on(RTM_EVENTS.REACTION_ADDED, function handleRtmReactionAdded(reaction) {
 rtm.on(RTM_EVENTS.REACTION_REMOVED, function handleRtmReactionRemoved(reaction) {
   console.log('Slack: Reaction removed:', reaction);
 });
+
+var storeMsg = function(dict, key, msg) {
+	if (!dict[key]) dict[key] = [];
+	dict[key].push({
+		'msg': msg,
+		'time': new Date()
+	});
+};
+var cleanMsg = function(arr) {
+	var now = new Date();
+	for (let i = 0; i < arr.length; ++i) {
+		//console.log("t:" , now - arr[i].time);
+		if (now - arr[i].time > config.muteTimeout) {
+		    arr.splice(i--, 1);
+   		}
+	}
+};
+var hasMsg = function(arr, msg) {
+	if (!arr) return false;
+	cleanMsg(arr);
+	//console.log("look in arr: ", arr, "msg: ", msg);
+	return arr.some( function(elem) {
+		return (elem !== '' && elem.msg === msg);
+	});
+};
+
 
