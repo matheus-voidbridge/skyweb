@@ -5,6 +5,7 @@ export declare class Poll {
     private requestWithJar;
     private cookieJar;
     private eventEmitter;
+    stopPolling: any;
     constructor(cookieJar: CookieJar, eventEmitter: EventEmitter);
     pollAll(skypeAccount: SkypeAccount, messagesCallback: (messages: Array<any>) => void): void;
     private static parsePollResult(pollResult, messagesCallback);

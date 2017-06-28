@@ -30,6 +30,9 @@ var MessageService = (function () {
             }
         });
     };
+    MessageService.prototype.getContent = function (url) {
+        console.log("OK! from getContent: " + url);
+    };
     return MessageService;
 }());
 exports.MessageService = MessageService;

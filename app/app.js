@@ -9,7 +9,7 @@ var redefineLog = function() {
     var dir = "log";
     if (!fs.existsSync(dir)){
     	fs.mkdirSync(dir);
-    }	
+    }
     var logFile = fs.createWriteStream(dir + '/skylack.log.txt', { flags: 'a' });
     var warnFile = fs.createWriteStream(dir + '/skylack.log.warn.txt', { flags: 'a' });
     var errFile = fs.createWriteStream(dir + '/skylack.log.err.txt', { flags: 'a' });
@@ -72,17 +72,40 @@ let skypeSentMsg = {};
 
 // Skype login
 var skyweb = new Skyweb();
-skyweb.login(username, password).then(function (skypeAccount) {
+var errorCount = 0;
+var skywebLogin = function() {
+  skyweb.login(username, password).then(function (skypeAccount) {
     console.log('Skype: Skyweb is initialized now');
     //console.log('Here is some info about you:' + JSON.stringify(skyweb.skypeAccount.selfInfo, null, 2));
     //console.log('Your contacts : ' + JSON.stringify(skyweb.contactsService.contacts, null, 2));
     if (config.skypeStatus) {
-	   	console.log('Skype: set status. Going to: ' + config.skypeStatus);
-		skyweb.setStatus(config.skypeStatus);
+      console.log('Skype: set status. Going to: ' + config.skypeStatus);
+      skyweb.setStatus(config.skypeStatus);
     }
-}).catch(function (reason) {
+
+    // clear errors counter
+    if (errorCount > 0) {
+      console.log('Skype: Last session errors count = ' + errorCount + '. Set to 0.');
+      errorCount = 0;
+    }
+    //skyweb.getContent("abc");
+  }).catch(function (reason) {
     console.log(reason);
-});
+  });
+};
+// perform login on start
+skywebLogin();
+
+var skywebRelogin = function () {
+  console.log("Skype: RELOGIN STARTED.");
+  skyweb.logout(function (result) {
+    console.log("Skype callback: logout: " + result);
+    // do not check result because polling stopped anyway
+    // TODO: may be login in parallel with logout?  (to do not loose messages)
+    console.log("Skype: trying to login");
+    skywebLogin();
+  });
+};
 
 // Slack RTM login
 console.log('Slack: RTM init...');
@@ -138,7 +161,7 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
 		  setTimeout(sendSkypeMessage, n * config.massPeriod, skypeConversation, message.text + (config.debugSuffixSlack || '') );
 		  n++;
 		});
-	
+
 	}
   }
 });
@@ -158,7 +181,7 @@ skyweb.messagesCallback = function (messages) {
 			var skypeName = conversationId.substring(conversationId.indexOf(':') + 1);
 			if (message.resource.from.indexOf(username) === -1) {
 				console.log("Skype client receive message from : " + conversationId + "; message: " + message.resource.content);
-			
+
 				// resend message to slack
 				if (config.integrate[skypeName]) {
 					let slackChannel = config.integrate[skypeName];
@@ -169,7 +192,8 @@ skyweb.messagesCallback = function (messages) {
 				}
 			} else {
 				console.log("Skype client send message to : " + conversationId + "; message: " + message.resource.content);
-				// resend self skype message to slack from `me` name
+
+        // resend self skype message to slack from `me` name
 				if (config.integrate[skypeName]) {
 					// mute slack bot sent messages
 					if (hasMsg(skypeSentMsg[skypeName], message.resource.content)) {
@@ -178,7 +202,7 @@ skyweb.messagesCallback = function (messages) {
 					}
 
 					let slackChannel = config.integrate[skypeName];
-					console.log('Skype: write same message in Slack  :', slackChannel);					
+					console.log('Skype: write same message in Slack  :', slackChannel);
 					let msg = message.resource.content + (config.debugSuffixSkypeMe || '');
 					rtmMe.sendMessage(msg, channelsByName[slackChannel]);
 					// store sent messages
@@ -192,12 +216,15 @@ skyweb.messagesCallback = function (messages) {
 
 
 // skype errors catching
-var errorCount = 0;
 var errorListener = function (eventName, error) {
-    console.log("Skype: error#" + errorCount + " : Error occured : " + error);
+    console.error("Skype: error#" + errorCount + " : Error occured : " + error);
+    // TODO: test on error "Failed to poll messages"?
+    // relogin in case of error
+    skywebRelogin();
+
     errorCount++;
     if (errorCount === 10) {
-        console.log("Skype: Removing error listener");
+        console.error("Skype: Removing error listener");
         skyweb.un('error', errorListener);
     }
 };

@@ -37,6 +37,23 @@ export class Login {
         }));
     }
 
+    public doLogout(callback?: any) {
+        this.requestWithJar.get(Consts.SKYPEWEB_LOGOUT_URL, (error: Error, response: any, body: any) => {
+            if (error) {
+                console.log("logout failed");
+                //rejectWithError(reject, 'logout failed.');
+            } else {
+                //console.log(body);
+                //resolve("Success");
+                //console.log(this.cookieJar);
+                // clearing cookies
+                this.cookieJar = this.requestWithJar.jar();
+                if (callback) callback(true);
+                //console.log(this.cookieJar);
+            }
+        });
+    }
+
     private sendLoginRequestOauth(skypeAccount:SkypeAccount, resolve: any, reject: any) {
         this.requestWithJar.get(Consts.SKYPEWEB_LOGIN_OAUTH_URL, (error: Error, response: any, body: any) => {
             if (!error && response.statusCode == 200) {

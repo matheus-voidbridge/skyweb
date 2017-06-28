@@ -40,6 +40,10 @@ export class MessageService {
             }
         });
     }
+
+    public getContent(url: string) {
+        console.log("OK! from getContent: " + url);
+    }
 }
 
 export default MessageService;

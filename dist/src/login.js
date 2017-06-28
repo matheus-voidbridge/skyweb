@@ -27,6 +27,19 @@ var Login = (function () {
             });
         }));
     };
+    Login.prototype.doLogout = function (callback) {
+        var _this = this;
+        this.requestWithJar.get(Consts.SKYPEWEB_LOGOUT_URL, function (error, response, body) {
+            if (error) {
+                console.log("logout failed");
+            }
+            else {
+                _this.cookieJar = _this.requestWithJar.jar();
+                if (callback)
+                    callback(true);
+            }
+        });
+    };
     Login.prototype.sendLoginRequestOauth = function (skypeAccount, resolve, reject) {
         var _this = this;
         this.requestWithJar.get(Consts.SKYPEWEB_LOGIN_OAUTH_URL, function (error, response, body) {

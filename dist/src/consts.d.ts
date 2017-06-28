@@ -11,3 +11,4 @@ export declare const SKYPEWEB_LOGIN_OAUTH_URL = "https://login.skype.com/login/o
 export declare const SKYPEWEB_LOGIN_MICROSOFT_URL = "https://login.skype.com/login/microsoft?client_id=578134&redirect_uri=https%3A%2F%2Fweb.skype.com";
 export declare const SKYPEWEB_PPSECURE_OUTH_URL: string;
 export declare const SKYPEWEB_SELF_DISPLAYNAME_URL = "/users/self/displayname";
+export declare const SKYPEWEB_LOGOUT_URL = "https://login.skype.com/logout?client_id=578134&redirect_uri=https%3A%2F%2Fweb.skype.com&intsrc=client-_-webapp-_-production-_-go-signin";

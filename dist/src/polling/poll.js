@@ -31,6 +31,10 @@ var Poll = (function () {
                         '.\n Error: ' + error +
                         '.\n Body: ' + body);
                 }
+                if (_this.stopPolling) {
+                    console.log("Skype: STOP POLLING called");
+                    return;
+                }
                 _this.pollAll(skypeAccount, messagesCallback);
             });
         }, 1000);

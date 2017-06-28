@@ -27,7 +27,8 @@ var Skyweb = (function () {
         return new login_1.default(this.cookieJar, this.eventEmitter).doLogin(this.skypeAccount).then(function (skypeAccount) {
             return new es6_promise_1.Promise(_this.contactsService.loadContacts.bind(_this.contactsService, skypeAccount));
         }).then(function (skypeAccount) {
-            new poll_1.default(_this.cookieJar, _this.eventEmitter).pollAll(skypeAccount, function (messages) {
+            _this.pollObj = new poll_1.default(_this.cookieJar, _this.eventEmitter);
+            _this.pollObj.pollAll(skypeAccount, function (messages) {
                 if (_this.messagesCallback) {
                     _this.messagesCallback(messages);
                 }
@@ -37,6 +38,17 @@ var Skyweb = (function () {
     };
     Skyweb.prototype.sendMessage = function (conversationId, message, messagetype, contenttype) {
         this.messageService.sendMessage(this.skypeAccount, conversationId, message, messagetype, contenttype);
+    };
+    Skyweb.prototype.logout = function (callback) {
+        var me = this;
+        new login_1.default(this.cookieJar, this.eventEmitter).doLogout(function (result) {
+            me.pollObj.stopPolling = true;
+            if (callback)
+                callback(result);
+        });
+    };
+    Skyweb.prototype.getContent = function (url) {
+        this.messageService.getContent(url);
     };
     Skyweb.prototype.setStatus = function (status) {
         this.statusService.setStatus(this.skypeAccount, status);

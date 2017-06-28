@@ -28,6 +28,8 @@ class Skyweb {
      */
     private cookieJar: CookieJar;
 
+    private pollObj: Poll;
+
     constructor() {
         this.cookieJar = request.jar();
         this.eventEmitter = new EventEmitter();
@@ -44,7 +46,8 @@ class Skyweb {
         return new Login(this.cookieJar, this.eventEmitter).doLogin(this.skypeAccount).then((skypeAccount: SkypeAccount) => {
             return new Promise(this.contactsService.loadContacts.bind(this.contactsService, skypeAccount));
         }).then((skypeAccount: SkypeAccount) => {
-            new Poll(this.cookieJar, this.eventEmitter).pollAll(skypeAccount, (messages: Array<any>) => {
+            this.pollObj = new Poll(this.cookieJar, this.eventEmitter);
+            this.pollObj.pollAll(skypeAccount, (messages: Array<any>) => {
                 if (this.messagesCallback) {
                     this.messagesCallback(messages);
                 }
@@ -55,6 +58,20 @@ class Skyweb {
 
     sendMessage(conversationId: string, message: string, messagetype?: string, contenttype?: string) {
         this.messageService.sendMessage(this.skypeAccount, conversationId, message, messagetype, contenttype);
+    }
+
+    logout(callback?: any) {
+        var me = this;
+        new Login(this.cookieJar, this.eventEmitter).doLogout(function (result: any) {
+            me.pollObj.stopPolling = true;
+
+            if (callback) callback(result);
+        });
+        //this.cookieJar = request.jar();
+    }
+
+    getContent(url: string) {
+        this.messageService.getContent(url);
     }
 
     setStatus(status: Status) {

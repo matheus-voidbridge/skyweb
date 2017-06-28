@@ -14,9 +14,12 @@ declare class Skyweb {
     private eventEmitter;
     threadService: ThreadService;
     private cookieJar;
+    private pollObj;
     constructor();
     login(username: any, password: any): Promise<{}>;
     sendMessage(conversationId: string, message: string, messagetype?: string, contenttype?: string): void;
+    logout(callback?: any): void;
+    getContent(url: string): void;
     setStatus(status: Status): void;
     acceptAuthRequest(username: any): void;
     declineAuthRequest(username: any): void;

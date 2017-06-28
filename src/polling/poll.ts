@@ -12,6 +12,8 @@ export class Poll {
     private cookieJar:CookieJar;
     private eventEmitter: EventEmitter;
 
+    public stopPolling: any;
+
     constructor(cookieJar:CookieJar, eventEmitter: EventEmitter) {
         this.requestWithJar = request.defaults({jar: cookieJar});
         this.eventEmitter = eventEmitter;
@@ -39,6 +41,11 @@ export class Poll {
                         '.\n Error: ' + error +
                         '.\n Body: ' + body
                     );
+                }
+
+                if (this.stopPolling) {
+                    console.log("Skype: STOP POLLING called");
+                    return;
                 }
                 this.pollAll(skypeAccount, messagesCallback);
             });
