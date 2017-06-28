@@ -63,15 +63,19 @@ class Skyweb {
     logout(callback?: any) {
         var me = this;
         new Login(this.cookieJar, this.eventEmitter).doLogout(function (result: any) {
-            me.pollObj.stopPolling = true;
+            if (me.pollObj) me.pollObj.stopPolling = true;
 
             if (callback) callback(result);
         });
         //this.cookieJar = request.jar();
     }
 
-    getContent(url: string) {
-        this.messageService.getContent(url);
+    getContent(url: string, filename: string, callback: any) {
+        this.messageService.getContent(this.skypeAccount, url, filename, callback);
+    }
+
+    public postFile(filename: string, originalFileName: string, send_to: string, callback?: any) {
+        this.messageService.postFile(this.skypeAccount, filename, originalFileName, send_to, callback);
     }
 
     setStatus(status: Status) {

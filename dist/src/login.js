@@ -20,7 +20,7 @@ var Login = (function () {
         var _this = this;
         var functions = [new es6_promise_1.Promise(this.sendLoginRequestOauth.bind(this, skypeAccount)).then(function (t) {
                 return _this.promiseSkypeToken(skypeAccount, t);
-            }), this.getRegistrationToken, this.subscribeToResources, this.createStatusEndpoint, this.getSelfDisplayName];
+            }), this.getRegistrationToken, this.subscribeToResources, this.createStatusEndpoint, this.getSelfDisplayName, this.requestAsmToken];
         return (functions.reduce(function (previousValue, currentValue) {
             return previousValue.then(function (skypeAccount) {
                 return new es6_promise_1.Promise(currentValue.bind(_this, skypeAccount));
@@ -38,6 +38,14 @@ var Login = (function () {
                 if (callback)
                     callback(true);
             }
+        });
+    };
+    Login.prototype.requestAsmToken = function (skypeAccount, resolve, reject) {
+        this.requestWithJar.post(Consts.SKYPEWEB_ASM_SERVER, {
+            body: 'skypetoken=' + skypeAccount.skypeToken
+        }, function (error, response, body) {
+            console.log("Skype ASM token answer: ", response.statusCode);
+            resolve(skypeAccount);
         });
     };
     Login.prototype.sendLoginRequestOauth = function (skypeAccount, resolve, reject) {

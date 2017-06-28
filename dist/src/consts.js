@@ -14,4 +14,6 @@ exports.SKYPEWEB_LOGIN_MICROSOFT_URL = 'https://login.skype.com/login/microsoft?
 exports.SKYPEWEB_PPSECURE_OUTH_URL = exports.SKYPEWEB_LOGIN_LIVE_COM + "ppsecure/post.srf?wa=wsignin1.0&wp=MBI_SSL&wreply=https%3A%2F%2Flw.skype.com%2Flogin%2Foauth%2Fproxy%3Fclient_id%3D578134%26redirect_uri%3Dhttps%253A%252F%252Fweb.skype.com%26intsrc%3Dclient-_-webapp-_-production-_-go-signin%26site_name%3Dlw.skype.com";
 exports.SKYPEWEB_SELF_DISPLAYNAME_URL = '/users/self/displayname';
 exports.SKYPEWEB_LOGOUT_URL = 'https://login.skype.com/logout?client_id=578134&redirect_uri=https%3A%2F%2Fweb.skype.com&intsrc=client-_-webapp-_-production-_-go-signin';
+exports.SKYPEWEB_ASM_SERVER = 'https://api.asm.skype.com/v1/skypetokenauth';
+exports.SKYPEWEB_ASM_OBJECTS = 'https://api.asm.skype.com/v1/objects';
 //# sourceMappingURL=consts.js.map

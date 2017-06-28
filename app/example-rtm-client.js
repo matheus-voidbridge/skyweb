@@ -10,7 +10,7 @@ var RtmClient = require('@slack/client').RtmClient;
 var RTM_EVENTS = require('@slack/client').RTM_EVENTS;
 var CLIENT_EVENTS = require('@slack/client').CLIENT_EVENTS;
 
-var token = process.env.SLACK_API_TOKEN || 'xoxp-203299281251-203473315237-203377068962-d346461c4615848e7e13c29c0c85d8f9';
+var token = process.env.SLACK_API_TOKEN || config.slack_ApiToken;
 
 let channelsById = {};		// dictionary of channel names
 let channelsByName = {};	// dictionary of channel ids

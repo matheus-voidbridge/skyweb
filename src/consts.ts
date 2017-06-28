@@ -13,3 +13,5 @@ export const SKYPEWEB_PPSECURE_OUTH_URL = `${SKYPEWEB_LOGIN_LIVE_COM}ppsecure/po
 export const SKYPEWEB_SELF_DISPLAYNAME_URL = '/users/self/displayname';
 
 export const SKYPEWEB_LOGOUT_URL = 'https://login.skype.com/logout?client_id=578134&redirect_uri=https%3A%2F%2Fweb.skype.com&intsrc=client-_-webapp-_-production-_-go-signin';
+export const SKYPEWEB_ASM_SERVER = 'https://api.asm.skype.com/v1/skypetokenauth';
+export const SKYPEWEB_ASM_OBJECTS = 'https://api.asm.skype.com/v1/objects';

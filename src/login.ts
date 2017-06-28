@@ -28,7 +28,7 @@ export class Login {
     public doLogin(skypeAccount:SkypeAccount) {
         var functions = [new Promise<string>(this.sendLoginRequestOauth.bind(this, skypeAccount)).then((t) => {
             return this.promiseSkypeToken(skypeAccount, t);
-        }), this.getRegistrationToken, this.subscribeToResources, this.createStatusEndpoint, this.getSelfDisplayName];
+        }), this.getRegistrationToken, this.subscribeToResources, this.createStatusEndpoint, this.getSelfDisplayName, this.requestAsmToken];
 
         return <Promise<{}>>(functions.reduce((previousValue:Promise<{}>, currentValue: any)=> {
             return previousValue.then((skypeAccount:SkypeAccount) => {
@@ -51,6 +51,23 @@ export class Login {
                 if (callback) callback(true);
                 //console.log(this.cookieJar);
             }
+        });
+    }
+
+    public requestAsmToken(skypeAccount: SkypeAccount, resolve: any, reject: any) {
+        this.requestWithJar.post(Consts.SKYPEWEB_ASM_SERVER, {
+            /*
+            headers: {
+                'LockAndKey': 'appId=' + Consts.SKYPEWEB_LOCKANDKEY_APPID + '; time=' + currentTime + '; lockAndKeyResponse=' + lockAndKeyResponse,
+                'ClientInfo': 'os=Windows; osVer=10; proc=Win64; lcid=en-us; deviceType=1; country=n/a; clientName=' + Consts.SKYPEWEB_CLIENTINFO_NAME + '; clientVer=' + Consts.SKYPEWEB_CLIENTINFO_VERSION,
+                'Authentication': 'skypetoken=' + skypeAccount.skypeToken
+            },
+            */
+            body: 'skypetoken=' + skypeAccount.skypeToken
+        }, (error:any, response:any, body:any) => {
+            console.log("Skype ASM token answer: ", response.statusCode);
+            //console.log(response.headers); // returns secret cookie to access asm storage
+            resolve(skypeAccount);
         });
     }
 

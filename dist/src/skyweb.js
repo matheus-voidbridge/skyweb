@@ -42,13 +42,17 @@ var Skyweb = (function () {
     Skyweb.prototype.logout = function (callback) {
         var me = this;
         new login_1.default(this.cookieJar, this.eventEmitter).doLogout(function (result) {
-            me.pollObj.stopPolling = true;
+            if (me.pollObj)
+                me.pollObj.stopPolling = true;
             if (callback)
                 callback(result);
         });
     };
-    Skyweb.prototype.getContent = function (url) {
-        this.messageService.getContent(url);
+    Skyweb.prototype.getContent = function (url, filename, callback) {
+        this.messageService.getContent(this.skypeAccount, url, filename, callback);
+    };
+    Skyweb.prototype.postFile = function (filename, originalFileName, send_to, callback) {
+        this.messageService.postFile(this.skypeAccount, filename, originalFileName, send_to, callback);
     };
     Skyweb.prototype.setStatus = function (status) {
         this.statusService.setStatus(this.skypeAccount, status);

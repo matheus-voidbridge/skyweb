@@ -1,12 +1,13 @@
 "use strict";
 
 var config = require('./config');
+var crypto = require('crypto');
+var fs = require('fs');
 
 var redefineLog = function() {
-    var fs = require('fs');
     var util = require('util');
 
-    var dir = "log";
+    var dir = config.logDir;
     if (!fs.existsSync(dir)){
     	fs.mkdirSync(dir);
     }
@@ -42,6 +43,9 @@ var redefineLog = function() {
     }
   };
 redefineLog();
+if (!fs.existsSync(config.tmpDir)){
+  fs.mkdirSync(config.tmpDir);
+}
 
 config.integrateSlack = {};
 Object.keys(config.integrate).forEach(function (skypeName) {
@@ -88,7 +92,10 @@ var skywebLogin = function() {
       console.log('Skype: Last session errors count = ' + errorCount + '. Set to 0.');
       errorCount = 0;
     }
-    //skyweb.getContent("abc");
+    //
+    //skyweb.postFile("demo.js", "demo.js", "8:live:strelkopf");
+    //skyweb.getContent("https://api.asm.skype.com/v1/objects/0-neu-d4-5e92664330f7499ef62daf8f047ea426/views/original", "tmp/skype_down.txt");
+    //
   }).catch(function (reason) {
     console.log(reason);
   });
@@ -123,97 +130,229 @@ rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
   }
   console.log("====== END OF Slack Channels LIST =================== ");
   console.log(`Slack: Logged in as  ${rtmStartData.self.name}  of team  ${rtmStartData.team.name} , but not yet connected to a channel`);
+
+  // trying to dowload file
+  //rtmDownloadFile("https://files.slack.com/files-pri/T5Z8T897D-F60D700AV/download/demo.js");
+  //
 });
+var rtmDownloadFile = function(fileUri, filename, callback) {
+  let fs = require('fs');
+  var file = fs.createWriteStream(filename);
+
+  var request = require('request');
+  let statusCode = 500;
+  request.get(fileUri, {
+    'headers': {
+      'Authorization': "Bearer " + tokenMe
+    }
+  })
+    .on('response', function(response) {
+      statusCode = response.statusCode;
+    })
+    .pipe(file)
+    .on('finish', function () {
+      const stats = fs.statSync(filename);
+      const fileSizeInBytes = stats.size;
+
+      if (statusCode == 200) {
+        console.log("Slack: got file content to: " + filename, " size: ", fileSizeInBytes);
+        if (callback) callback(true);
+      } else {
+        console.warn("Slack: got wrong status of receiving file:", statusCode);
+        if (callback) callback(false);
+      }
+    });
+  ;
+};
+var rtmPostFile = function (filename, originalFileName, channels, who_post) {
+  //curl -F file=@demo.js -F channels=#general -F token=xoxp-TOKEN https://slack.com/api/files.upload
+
+  if (!who_post) who_post = token;
+  var request = require('request');
+  var req = request.post('https://slack.com/api/files.upload', function (err, resp, body) {
+    if (err) {
+      console.error('Error uploading file to Slack!');
+    } else {
+      console.log('Slack: upload file result: ' + resp.statusCode);
+    }
+  });
+  var form = req.form();
+  form.append('file', fs.createReadStream(filename));
+  form.append('channels', channels);
+  form.append('token', who_post);
+  form.append('filename', originalFileName);
+
+  console.log("Slack: SENDING...");
+};
 
 
 // Slack message listener
 rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
   if (message) {
-	let fromChannel = channelsById[message.channel];
-	console.log('Slack client receive message:', message.text, "; channel_id:", message.channel, " channel:", fromChannel);
-	// resend message to skype
-	if (config.integrateSlack[fromChannel]) {
-	  let skypeName = config.integrateSlack[fromChannel];
-	  // mute skype bot sent messages
-	  if (hasMsg(slackSentMsg[fromChannel], message.text)) {
-		  console.log('Slack: mute double message sent from skype.');
-		  return;
-	  }
-	  let skypeConversation = "8:" + skypeName;
-	  console.log('Slack: redirect message to Skype :', skypeConversation);
-	  let msg = message.text + (config.debugSuffixSlack || '');
-	  skyweb.sendMessage(skypeConversation, msg);
-	  // store sent messages
-	  storeMsg(skypeSentMsg, skypeName, msg);
+    let fromChannel = channelsById[message.channel];
+    //console.log('--Slack client receive message:' + JSON.stringify(message, null, 2));
+    console.log('Slack client receive message:', message.text, "; channel_id:", message.channel, " channel:", fromChannel,
+      ((message.subtype)? " subtype: " + message.subtype : "")
+    );
+    // resend message to skype
+    if (config.integrateSlack[fromChannel]) {
+      let skypeName = config.integrateSlack[fromChannel];
+      let skypeConversation = "8:" + skypeName;
 
+      if (message.subtype == "file_share" && message.file) {
+        // mute skype bot sent messages
+        if (hasMsg(slackSentMsg[fromChannel], message.file.name, 'file')) {
+          console.log('Slack: mute double file sent from skype.');
+          return;
+        }
 
-	/*
-	  let channel = config.postAllChannel;
-	  console.log('Slack Redirect Message to :', channelsByName[channel]);
-	  rtm.sendMessage(message.text + ". Dog rules!", channelsByName[channel]);
-	*/
-	}
-	// mass send checking
-	if (fromChannel == config.massSendFromChannel) {
-		let n = 1;
-		Object.keys(config.integrate).forEach(function (skypeName) {
-		  let skypeConversation = "8:" + skypeName;
-		  setTimeout(sendSkypeMessage, n * config.massPeriod, skypeConversation, message.text + (config.debugSuffixSlack || '') );
-		  n++;
-		});
+        console.log('Slack: catch shared file: ' + message.file.url_private_download);
+        let filename = config.tmpDir + "/" + crypto.createHash('md5').update(message.file.url_private_download).digest('hex');
+        rtmDownloadFile(message.file.url_private_download, filename, function () {
+          console.log("Slack: resend file to Skype: ", skypeName, "  filename: " + message.file.name);
+          // upload file to Skype
+          skyweb.postFile(filename, message.file.name, skypeConversation, function (result) {
+            // store sent files
+            storeMsg(skypeSentMsg, skypeName, message.file.name, 'file');
+          });
+        });
+      } else {
+        // mute skype bot sent messages
+        if (hasMsg(slackSentMsg[fromChannel], message.text)) {
+          console.log('Slack: mute double message sent from skype.');
 
-	}
+          return;
+        }
+        console.log('Slack: redirect message to Skype :', skypeConversation);
+        let msg = message.text + (config.debugSuffixSlack || '');
+        skyweb.sendMessage(skypeConversation, msg);
+        // store sent messages
+        storeMsg(skypeSentMsg, skypeName, msg);
+      }
+    }
+    // mass send checking
+    if (fromChannel == config.massSendFromChannel && !message.file) {
+      let n = 1;
+      Object.keys(config.integrate).forEach(function (skypeName) {
+        let skypeConversation = "8:" + skypeName;
+        setTimeout(sendSkypeMessage, n * config.massPeriod, skypeConversation, message.text + (config.debugSuffixSlack || '') );
+        n++;
+      });
+
+    }
   }
 });
 var sendSkypeMessage = function(skypeConversation, text) {
 	console.log('Slack: mass send message to Skype :', skypeConversation);
 	skyweb.sendMessage(skypeConversation, text);
 };
+/*rtm.on(RTM_EVENTS.FILE_SHARED, function handleRtmMessage(message) {
+  console.log('File was shared: ', message);
+});*/
 
 
 // Skype message listener
 skyweb.messagesCallback = function (messages) {
-    messages.forEach(function (message) {
-		//console.log("Skype client receive message: " + JSON.stringify(message.resource, null, 2));
+  messages.forEach(function (message) {
+    //console.log("Skype client receive message: " + JSON.stringify(message.resource, null, 2));
 		if (message && message.resource &&message.resource.messagetype !== 'Control/Typing' && message.resource.messagetype !== 'Control/ClearTyping') {
 			var conversationLink = message.resource.conversationLink;
 			var conversationId = conversationLink.substring(conversationLink.lastIndexOf('/') + 1);
 			var skypeName = conversationId.substring(conversationId.indexOf(':') + 1);
+      var slackChannel = config.integrate[skypeName];
+      var msg = message.resource.content;
 			if (message.resource.from.indexOf(username) === -1) {
-				console.log("Skype client receive message from : " + conversationId + "; message: " + message.resource.content);
+				console.log("Skype client receive message from : " + conversationId + "; message: " + msg);
 
 				// resend message to slack
 				if (config.integrate[skypeName]) {
-					let slackChannel = config.integrate[skypeName];
-					console.log('Skype: redirect message to Slack :', slackChannel);
-					let msg = message.resource.content + (config.debugSuffixSkype || '');
-					rtm.sendMessage(msg, channelsByName[slackChannel]);
-					// don't store sent messages
+
+          // test for attachments
+          if (msg && msg.indexOf("<URIObject") === 0) {
+            if (hasMsg(skypeSentMsg[skypeName], getSkypeOriginalFilename(msg), 'file')) {
+              console.log('Skype: mute double file sent from slack.');
+              return;
+            }
+            resendSkypeFileMsg(msg, slackChannel, token);
+          } else {
+            console.log('Skype: redirect message to Slack :', slackChannel);
+            let msg = message.resource.content + (config.debugSuffixSkype || '');
+            rtm.sendMessage(msg, channelsByName[slackChannel]);
+            // don't store sent messages
+          }
 				}
 			} else {
-				console.log("Skype client send message to : " + conversationId + "; message: " + message.resource.content);
+				console.log("Skype client send message to : " + conversationId + "; message: " + msg);
 
         // resend self skype message to slack from `me` name
 				if (config.integrate[skypeName]) {
-					// mute slack bot sent messages
-					if (hasMsg(skypeSentMsg[skypeName], message.resource.content)) {
+          // test for attachments
+          if (msg && msg.indexOf("<URIObject") === 0) {
+            console.log('Skype: SELF file post detected.');
+            // mute slack bot sent messages
+            if (hasMsg(skypeSentMsg[skypeName], getSkypeOriginalFilename(msg), 'file')) {
+              console.log('Skype: mute double file sent from slack.');
+            } else {
+              resendSkypeFileMsg(msg, config.integrate[skypeName], tokenMe);
+            }
+            return;
+          }
+
+            // mute slack bot sent messages
+					if (hasMsg(skypeSentMsg[skypeName], msg)) {
 					  console.log('Skype: mute double message sent from slack.');
 					  return;
 					}
 
 					let slackChannel = config.integrate[skypeName];
 					console.log('Skype: write same message in Slack  :', slackChannel);
-					let msg = message.resource.content + (config.debugSuffixSkypeMe || '');
-					rtmMe.sendMessage(msg, channelsByName[slackChannel]);
+					let sentMsg = message.resource.content + (config.debugSuffixSkypeMe || '');
+					rtmMe.sendMessage(sentMsg, channelsByName[slackChannel]);
 					// store sent messages
-					storeMsg(slackSentMsg, slackChannel, msg);
+					storeMsg(slackSentMsg, slackChannel, sentMsg);
 					//console.log("slackSentMsg: " + JSON.stringify(slackSentMsg, null, 2));
 				}
 			}
 		}
     });
 };
+// parse Skype msg, extact file name and send it to Slack
+function resendSkypeFileMsg(msg, slackChannel, who_post) {
+  let isUri = msg.indexOf('uri="') + 5;
+  let ieUri = msg.indexOf('"', isUri);
+  if (isUri >= 0 && ieUri >= 0) {
+    let suffix = (msg.indexOf('type="Picture') !== -1)? "/views/imgpsh_fullsize" : "/views/original";
+    let uri = msg.substring(isUri, ieUri) + suffix;
+    console.log("Skype: downloading file by URI: ", uri);
+    // create filename by hashing its uri
+    var filename = config.tmpDir + "/" + crypto.createHash('md5').update(uri).digest('hex');
+    skyweb.getContent(uri, filename, function (result) {
+      if (result) {
+        let originalName = getSkypeOriginalFilename(msg);
 
+        console.log("Skype: resend file to Slack: ", "#" + slackChannel, "  filename: " + originalName);
+        rtmPostFile(filename, originalName, channelsByName[slackChannel], who_post);
+        // store sent files
+        storeMsg(slackSentMsg, slackChannel, originalName, 'file');
+      }
+    });
+  }
+};
+function getSkypeOriginalFilename(msg) {
+  let isTitle = msg.indexOf('<Title>') + 7;
+  let ieTitle = msg.indexOf('</Title>', isTitle);
+  let filename = 'unnamed';
+  if (isTitle >= 0 && ieTitle >= 0) {
+    filename = msg.substring(isTitle, ieTitle);
+  } else {
+    // <OriginalName v="   name for pictures
+    let isTitle = msg.indexOf('<OriginalName v="') + 17;
+    let ieTitle = msg.indexOf('" />', isTitle);
+    if (isTitle >= 0 && ieTitle >= 0) filename = msg.substring(isTitle, ieTitle);
+  }
+  if (filename.indexOf('Title: ') === 0) filename = filename.substring(7);
+  return filename;
+}
 
 // skype errors catching
 var errorListener = function (eventName, error) {
@@ -239,28 +378,34 @@ rtm.on(RTM_EVENTS.REACTION_REMOVED, function handleRtmReactionRemoved(reaction) 
   console.log('Slack: Reaction removed:', reaction);
 });
 
-var storeMsg = function(dict, key, msg) {
+var storeMsg = function(dict, key, msg, type) {
+  if (!type) type = 'msg';
 	if (!dict[key]) dict[key] = [];
 	dict[key].push({
 		'msg': msg,
-		'time': new Date()
+		'time': new Date(),
+    'type': type
 	});
 };
 var cleanMsg = function(arr) {
 	var now = new Date();
 	for (let i = 0; i < arr.length; ++i) {
 		//console.log("t:" , now - arr[i].time);
-		if (now - arr[i].time > config.muteTimeout) {
+		if (arr[i].type == 'msg' && now - arr[i].time > config.muteTimeout) {
 		    arr.splice(i--, 1);
-   		}
+    }
+    if (arr[i].type == 'file' && now - arr[i].time > config.muteFileTimeout) {
+      arr.splice(i--, 1);
+    }
 	}
 };
-var hasMsg = function(arr, msg) {
+var hasMsg = function(arr, msg, type) {
+  if (!type) type = 'msg';
 	if (!arr) return false;
 	cleanMsg(arr);
 	//console.log("look in arr: ", arr, "msg: ", msg);
 	return arr.some( function(elem) {
-		return (elem !== '' && elem.msg === msg);
+		return (elem !== '' && elem.type == type && elem.msg === msg);
 	});
 };
 
