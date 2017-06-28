@@ -18,7 +18,7 @@ var StatusService = (function () {
                 'RegistrationToken': skypeAccount.registrationTokenParams.raw
             }
         }, function (error, response, body) {
-            if (!error && response.statusCode === 200) {
+            if (!error && response && response.statusCode === 200) {
             }
             else {
                 _this.eventEmitter.fire('error', 'Failed to change status' +

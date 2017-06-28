@@ -26,13 +26,13 @@ export class StatusService {
                 'RegistrationToken': skypeAccount.registrationTokenParams.raw
             }
         }, (error:any, response:http.IncomingMessage, body:any) => {
-            if (!error && response.statusCode === 200) {
+            if (!error && response && response.statusCode === 200) {
                 //fixme? send success callback?
             } else {
                 this.eventEmitter.fire('error', 'Failed to change status' +
                     '.\n Error code: ' + response.statusCode +
                     '.\n Error: ' + error +
-                    '.\n Body: ' + body);                
+                    '.\n Body: ' + body);
             }
         });
     }
