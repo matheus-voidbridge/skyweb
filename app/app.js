@@ -347,8 +347,8 @@ function getSkypeOriginalFilename(msg) {
   } else {
     // <OriginalName v="   name for pictures
     let isTitle = msg.indexOf('<OriginalName v="') + 17;
-    let ieTitle = msg.indexOf('" />', isTitle);
-    if (isTitle >= 0 && ieTitle >= 0) filename = msg.substring(isTitle, ieTitle);
+    let ieTitle = msg.indexOf('"', isTitle);
+    if (isTitle >= 0 && ieTitle >= 0 && ieTitle > isTitle) filename = msg.substring(isTitle, ieTitle);
   }
   if (filename.indexOf('Title: ') === 0) filename = filename.substring(7);
   return filename;
