@@ -388,13 +388,13 @@ var storeMsg = function(dict, key, msg, type) {
 	});
 };
 var cleanMsg = function(arr) {
+  if (!arr) return false;
 	var now = new Date();
 	for (let i = 0; i < arr.length; ++i) {
 		//console.log("t:" , now - arr[i].time);
 		if (arr[i].type == 'msg' && now - arr[i].time > config.muteTimeout) {
 		    arr.splice(i--, 1);
-    }
-    if (arr[i].type == 'file' && now - arr[i].time > config.muteFileTimeout) {
+    } else if (arr[i].type == 'file' && now - arr[i].time > config.muteFileTimeout) {
       arr.splice(i--, 1);
     }
 	}
