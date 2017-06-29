@@ -33,7 +33,7 @@ web.chat.postMessage('C5YQYD265', 'Hello there', function(err, res) {
 // sending via webhooks
 var IncomingWebhook = require('@slack/client').IncomingWebhook;
 
-var url = process.env.SLACK_WEBHOOK_URL || 'https://hooks.slack.com/services/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'; //see section above on sensitive data
+var url = process.env.SLACK_WEBHOOK_URL || 'https://hooks.slack.com/services/T--'; //see section above on sensitive data
 
 var webhook = new IncomingWebhook(url);
 

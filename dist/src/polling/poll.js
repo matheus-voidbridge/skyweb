@@ -42,7 +42,8 @@ var Poll = (function () {
     Poll.parsePollResult = function (pollResult, messagesCallback) {
         if (pollResult.eventMessages) {
             var messages = pollResult.eventMessages.filter(function (item) {
-                return item.resourceType === 'NewMessage';
+                return item.resourceType === 'ConversationUpdate' ||
+                    item.resourceType === 'NewMessage';
             });
             if (messages.length) {
                 messagesCallback(messages);

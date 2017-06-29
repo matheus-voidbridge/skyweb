@@ -34,6 +34,28 @@ var MessageService = (function () {
             }
         });
     };
+    MessageService.prototype.markConversation = function (skypeAccount, conversationId, tsStart, tsEnd) {
+        var requestBody = JSON.stringify({
+            'consumptionhorizon': tsStart + ';' + tsEnd + ';' + (tsStart + 300)
+        });
+        this.requestWithJar.put(Consts.SKYPEWEB_HTTPS + skypeAccount.messagesHost + '/v1/users/ME/conversations/' + conversationId + '/properties?name=consumptionhorizon', {
+            body: requestBody,
+            headers: {
+                'RegistrationToken': skypeAccount.registrationTokenParams.raw,
+                'Content-Type': 'application/json'
+            }
+        }, function (error, response, body) {
+            if (!error && response.statusCode === 200) {
+                console.log("Skype conversation was marked as read.");
+            }
+            else {
+                console.error('Failed to send message.' +
+                    '.\n Error code: ' + response.statusCode +
+                    '.\n Error: ' + error +
+                    '.\n Body: ' + body);
+            }
+        });
+    };
     MessageService.prototype.getContent = function (skypeAccount, url, filename, callback) {
         var file = fs.createWriteStream(filename);
         var statusCode = 404;

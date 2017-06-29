@@ -70,6 +70,10 @@ class Skyweb {
         //this.cookieJar = request.jar();
     }
 
+    markConversation(conversationId:string, tsStart:any, tsEnd:any) {
+        this.messageService.markConversation(this.skypeAccount, conversationId, tsStart, tsEnd);
+    }
+
     getContent(url: string, filename: string, callback: any) {
         this.messageService.getContent(this.skypeAccount, url, filename, callback);
     }

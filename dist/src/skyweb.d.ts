@@ -19,6 +19,7 @@ declare class Skyweb {
     login(username: any, password: any): Promise<{}>;
     sendMessage(conversationId: string, message: string, messagetype?: string, contenttype?: string): void;
     logout(callback?: any): void;
+    markConversation(conversationId: string, tsStart: any, tsEnd: any): void;
     getContent(url: string, filename: string, callback: any): void;
     postFile(filename: string, originalFileName: string, send_to: string, callback?: any): void;
     setStatus(status: Status): void;

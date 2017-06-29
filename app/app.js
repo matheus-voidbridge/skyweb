@@ -75,6 +75,9 @@ let channelsByName = {};	// dictionary of channel ids
 let slackSentMsg = {};
 let skypeSentMsg = {};
 
+let slackChannelsReading = {}; // last read time by slack channel
+let skypeChatReading = {}; // last read time by skype conversation
+
 // Skype login
 var skyweb = new Skyweb();
 var errorCount = 0;
@@ -132,8 +135,8 @@ rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
   console.log("====== END OF Slack Channels LIST =================== ");
   console.log(`Slack: Logged in as  ${rtmStartData.self.name}  of team  ${rtmStartData.team.name} , but not yet connected to a channel`);
 
-  // trying to dowload file
-  //rtmDownloadFile("https://files.slack.com/files-pri/T5Z8T897D-F60D700AV/download/demo.js");
+  //
+  //rtmMarkChannel(tokenMe, channelsByName["general"]);
   //
 });
 var rtmDownloadFile = function(fileUri, filename, callback) {
@@ -184,6 +187,21 @@ var rtmPostFile = function (filename, originalFileName, channels, who_post) {
   form.append('filename', originalFileName);
 
   console.log("Slack: SENDING...");
+};
+var rtmMarkChannel = function (token, channel, timestamp) {
+  if (!timestamp) timestamp = Math.floor(new Date() / 1000);
+  var request = require('request');
+  var req = request.post('https://slack.com/api/channels.mark', function (err, resp, body) {
+    if (err) {
+      console.error('Error marking channel in Slack!');
+    } else {
+      console.log('Slack: marking channel result: ' + resp.statusCode, resp.body);
+    }
+  });
+  var form = req.form();
+  form.append('token', token);
+  form.append('channel', channel);
+  form.append('ts', timestamp);
 };
 
 
@@ -258,15 +276,43 @@ var sendSkypeMessage = function(skypeConversation, text) {
 var getOrigMsgWithTags = function(msg) {
   return (msg)? msg.replace(/&lt;/g, '<').replace(/&gt;/g, '>') : '';
 }
-/*rtm.on(RTM_EVENTS.FILE_SHARED, function handleRtmMessage(message) {
-  console.log('File was shared: ', message);
-});*/
+rtmMe.on(RTM_EVENTS.CHANNEL_MARKED, function handleRtmMessage(message) {
+  if (message.channel && message.ts) {
+    let fromChannel = channelsById[message.channel];
+    let ts = message.ts;
+    if (config.integrateSlack[fromChannel]) {
+      // mute?
+      if ((new Date()) - slackChannelsReading[fromChannel] < config.muteTimeout) {
+        console.log('Slack: channel was marked: muted by skype');
+        return;
+      }
+
+      let skypeName = config.integrateSlack[fromChannel];
+      let skypeConversation = "8:" + skypeName;
+      console.log('Slack: channel was marked: ', fromChannel, " updating skype conversation: " + skypeConversation);
+
+      // it's weird that from should be greater to (???)
+      let to = Math.floor(new Date() / 1000);
+      let from = (to + 60*60*24);
+      skyweb.markConversation(skypeConversation, from*1000,  to*1000);
+
+      // remember time of updating slack channel to mute reverse
+      skypeChatReading[skypeName] = new Date();
+    }
+  }
+});
 
 
 // Skype message listener
 skyweb.messagesCallback = function (messages) {
   messages.forEach(function (message) {
-    console.log("Skype client receive message: " + JSON.stringify(message.resource, null, 2));
+    // message read status
+    if (message && message.resourceType === 'ConversationUpdate') {
+      skypeReadStatusMessage(message);
+      return;
+    }
+
+    //console.log("Skype client receive message: " + JSON.stringify(message.resource, null, 2));
 		if (message && message.resource &&message.resource.messagetype !== 'Control/Typing' && message.resource.messagetype !== 'Control/ClearTyping') {
 			var conversationLink = message.resource.conversationLink;
 			var conversationId = conversationLink.substring(conversationLink.lastIndexOf('/') + 1);
@@ -345,6 +391,26 @@ skyweb.messagesCallback = function (messages) {
 		}
     });
 };
+var skypeReadStatusMessage = function (message) {
+  if (message && message.resource && message.resource.id) {
+    console.log("Skype client receive ConversationUpdate: " + message.resource.id); //JSON.stringify(message, null, 2));
+    let conversationId = message.resource.id;
+    var skypeName = conversationId.substring(conversationId.indexOf(':') + 1);
+    if (config.integrate[skypeName]) {
+      // mute?
+      if ((new Date()) - skypeChatReading[skypeName] < config.muteTimeout) {
+        console.log('Skype: channel was marked: muted by slack');
+        return;
+      }
+
+      var slackChannel = config.integrate[skypeName];
+      console.log("Skype update conversation read state in Slack: skype=" + conversationId, "  slack= #" + slackChannel);
+      rtmMarkChannel(tokenMe, channelsByName[slackChannel]);
+      // remember time of updating slack channel to mute reverse
+      slackChannelsReading[slackChannel] = new Date();
+    }
+  }
+}
 // parse Skype msg, extact file name and send it to Slack
 function resendSkypeFileMsg(msg, slackChannel, who_post) {
   let isUri = msg.indexOf('uri="') + 5;

@@ -48,6 +48,9 @@ var Skyweb = (function () {
                 callback(result);
         });
     };
+    Skyweb.prototype.markConversation = function (conversationId, tsStart, tsEnd) {
+        this.messageService.markConversation(this.skypeAccount, conversationId, tsStart, tsEnd);
+    };
     Skyweb.prototype.getContent = function (url, filename, callback) {
         this.messageService.getContent(this.skypeAccount, url, filename, callback);
     };
