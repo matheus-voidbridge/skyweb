@@ -3,6 +3,7 @@
 var config = require('./config');
 var crypto = require('crypto');
 var fs = require('fs');
+var sanitizeHtml = require('sanitize-html');
 
 var redefineLog = function() {
     var util = require('util');
@@ -216,13 +217,21 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
             storeMsg(skypeSentMsg, skypeName, message.file.name, 'file');
           });
         });
+      } else if (message.subtype == "message_changed") {
+        // slack message removed
+        console.log("Slack: message changed: ", JSON.stringify(message, null, 2));
+      } else if (message.subtype == "message_deleted") {
+        // slack message removed
+        console.log("Slack: message removed: ", JSON.stringify(message, null, 2));
       } else {
         // mute skype bot sent messages
-        if (hasMsg(slackSentMsg[fromChannel], message.text)) {
+        if (hasMsg(slackSentMsg[fromChannel], message.text) ||
+            hasMsg(slackSentMsg[fromChannel], getOrigMsgWithTags(message.text))
+          ) {
           console.log('Slack: mute double message sent from skype.');
-
           return;
         }
+        // resend
         console.log('Slack: redirect message to Skype :', skypeConversation);
         let msg = message.text + (config.debugSuffixSlack || '');
         skyweb.sendMessage(skypeConversation, msg);
@@ -246,6 +255,9 @@ var sendSkypeMessage = function(skypeConversation, text) {
 	console.log('Slack: mass send message to Skype :', skypeConversation);
 	skyweb.sendMessage(skypeConversation, text);
 };
+var getOrigMsgWithTags = function(msg) {
+  return (msg)? msg.replace(/&lt;/g, '<').replace(/&gt;/g, '>') : '';
+}
 /*rtm.on(RTM_EVENTS.FILE_SHARED, function handleRtmMessage(message) {
   console.log('File was shared: ', message);
 });*/
@@ -254,7 +266,7 @@ var sendSkypeMessage = function(skypeConversation, text) {
 // Skype message listener
 skyweb.messagesCallback = function (messages) {
   messages.forEach(function (message) {
-    //console.log("Skype client receive message: " + JSON.stringify(message.resource, null, 2));
+    console.log("Skype client receive message: " + JSON.stringify(message.resource, null, 2));
 		if (message && message.resource &&message.resource.messagetype !== 'Control/Typing' && message.resource.messagetype !== 'Control/ClearTyping') {
 			var conversationLink = message.resource.conversationLink;
 			var conversationId = conversationLink.substring(conversationLink.lastIndexOf('/') + 1);
@@ -276,15 +288,23 @@ skyweb.messagesCallback = function (messages) {
             resendSkypeFileMsg(msg, slackChannel, token);
           } else {
             console.log('Skype: redirect message to Slack :', slackChannel);
-            let msg = message.resource.content + (config.debugSuffixSkype || '');
-            rtm.sendMessage(msg, channelsByName[slackChannel]);
+            let sentMsg = (msg)? sanitizeHtml(msg) + (config.debugSuffixSkype || '') : '';
+            if (message.resource.skypeeditedid) {
+              // some message was edited
+              if (sentMsg) {
+                sentMsg = "--edited msg: " + sentMsg;
+              } else {
+                sentMsg = "--removed msg--";
+              }
+            }
+            rtm.sendMessage(sentMsg, channelsByName[slackChannel]);
             // don't store sent messages
           }
 				}
 			} else {
 				console.log("Skype client send message to : " + conversationId + "; message: " + msg);
 
-        // resend self skype message to slack from `me` name
+        // resend Self skype Message to slack from `me` name
 				if (config.integrate[skypeName]) {
           // test for attachments
           if (msg && msg.indexOf("<URIObject") === 0) {
@@ -306,8 +326,17 @@ skyweb.messagesCallback = function (messages) {
 
 					let slackChannel = config.integrate[skypeName];
 					console.log('Skype: write same message in Slack  :', slackChannel);
-					let sentMsg = message.resource.content + (config.debugSuffixSkypeMe || '');
-					rtmMe.sendMessage(sentMsg, channelsByName[slackChannel]);
+          let sentMsg = (msg)? sanitizeHtml(msg) + (config.debugSuffixSkype || '') : '';
+          if (message.resource.skypeeditedid) {
+            // some message was edited
+            if (sentMsg) {
+              sentMsg = "--edited msg: " + sentMsg;
+            } else {
+              sentMsg = "--removed msg--";
+            }
+          }
+
+          rtmMe.sendMessage(sentMsg, channelsByName[slackChannel]);
 					// store sent messages
 					storeMsg(slackSentMsg, slackChannel, sentMsg);
 					//console.log("slackSentMsg: " + JSON.stringify(slackSentMsg, null, 2));

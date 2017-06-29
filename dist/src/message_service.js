@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 var request = require("request");
 var Consts = require("./consts");
+var utils_1 = require("./utils");
 var https = require("https");
 var fs = require("fs");
 var MessageService = (function () {
@@ -12,6 +13,7 @@ var MessageService = (function () {
     MessageService.prototype.sendMessage = function (skypeAccount, conversationId, message, messagetype, contenttype) {
         var _this = this;
         var requestBody = JSON.stringify({
+            'clientmessageid': utils_1.default.getCurrentTime() + '',
             'content': message,
             'messagetype': messagetype || 'RichText',
             'contenttype': contenttype || 'text'

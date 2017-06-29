@@ -19,8 +19,7 @@ export class MessageService {
 
     public sendMessage(skypeAccount:SkypeAccount, conversationId:string, message:string, messagetype?:string, contenttype?:string) {
         var requestBody = JSON.stringify({
-            ///'clientmessageid': Utils.getCurrentTime() + '', //fixme looks like we don't need this?(at least if we don't want to
-            // have the ability to modify text(content) of the message.)
+            'clientmessageid': Utils.getCurrentTime() + '', // // have the ability to modify text(content) of the message.)
             'content': message,
             'messagetype': messagetype || 'RichText',
             'contenttype': contenttype || 'text'
