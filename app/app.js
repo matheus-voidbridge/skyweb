@@ -30,6 +30,7 @@ if (!username || !password) {
 
 // Slack variables
 var RtmClient = require('@slack/client').RtmClient;
+var WebClient = require('@slack/client').WebClient;
 var RTM_EVENTS = require('@slack/client').RTM_EVENTS;
 var CLIENT_EVENTS = require('@slack/client').CLIENT_EVENTS;
 var token = config.slack_ApiToken;
@@ -87,6 +88,7 @@ var skywebRelogin = function () {
 console.log('Slack: RTM init...');
 var rtm = new RtmClient(token, { logLevel: 'info' });
 rtm.start();
+var slackWeb = new WebClient(token);
 var rtmMe = new RtmClient(tokenMe, { logLevel: 'info' });
 rtmMe.start();
 // The client will emit an RTM.AUTHENTICATED event on successful connection, with the `rtm.start` payload
@@ -175,6 +177,7 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
   if (message) {
     let fromChannel = channelsById[message.channel];
     //console.log('--Slack client receive message:' + JSON.stringify(message, null, 2));
+    if (message.subtype == "bot_message") return;
     console.log('Slack client receive message:', message.text, "; channel_id:", message.channel, " channel:", fromChannel,
       ((message.subtype)? " subtype: " + message.subtype : "")
     );
@@ -363,7 +366,30 @@ skyweb.messagesCallback = function (messages) {
                 sentMsg = "--removed msg--";
               }
             }
-            rtm.sendMessage(sentMsg, channelsByName[slackChannel]);
+            if (config.slack_sendAsBot) {
+              // send as bot user with changing name and avatar
+              let opt = {};
+              if (message.resource.imdisplayname) {
+                opt = {
+                  username: message.resource.imdisplayname,
+                  as_user: false,
+                };
+                // try to get avatar
+                let contactInfo = skyweb.contactsService.contacts.find(function (contact) {
+                  return contact.id == skypeName;
+                });
+                if (contactInfo && contactInfo.avatar_url) opt.icon_url = contactInfo.avatar_url;
+              }
+              slackWeb.chat.postMessage(channelsByName[slackChannel], sentMsg, opt, function(err, res) {
+                if (err) {
+                  console.error('Slack: sent msg error:', err);
+                } else {
+                  //console.log('Message sent: ', res);
+                }
+              });
+            } else {
+              rtm.sendMessage(sentMsg, channelsByName[slackChannel]);
+            }
             // don't store sent messages
           }
 				}
