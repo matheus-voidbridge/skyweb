@@ -4,46 +4,9 @@ var config = require('./config');
 var crypto = require('crypto');
 var fs = require('fs');
 var sanitizeHtml = require('sanitize-html');
+var helpers = require('./helpers')
 
-var redefineLog = function() {
-    var util = require('util');
-
-    var dir = config.logDir;
-    if (!fs.existsSync(dir)){
-    	fs.mkdirSync(dir);
-    }
-    var logFile = fs.createWriteStream(dir + '/skylack.log.txt', { flags: 'a' });
-    var warnFile = fs.createWriteStream(dir + '/skylack.log.warn.txt', { flags: 'a' });
-    var errFile = fs.createWriteStream(dir + '/skylack.log.err.txt', { flags: 'a' });
-    // Or 'w' to truncate the file every time the process starts.
-    var logStdout = process.stdout;
-
-    var date_str = function () {
-	return new Date().toISOString()
-		.replace(/T/, ' ')      // replace T with a space
-  		.replace(/\..+/, '') + ":  ";
-    };
-
-    console.old_log = console.log;
-    console.old_error = console.error;
-    console.old_warn = console.warn;
-
-    console.log = function () {
-      logFile.write(date_str() + util.format.apply(null, arguments) + '\n');
-      console.old_log(date_str() + util.format.apply(null, arguments));
-    }
-    console.error = function () {
-      logFile.write(date_str() + util.format.apply(null, arguments) + '\n');
-      errFile.write(date_str() + util.format.apply(null, arguments) + '\n');
-      console.old_error(date_str() + util.format.apply(null, arguments));
-    }
-    console.warn = function () {
-      logFile.write(date_str() + util.format.apply(null, arguments) + '\n');
-      warnFile.write(date_str() + util.format.apply(null, arguments) + '\n');
-      console.old_warn(date_str() + util.format.apply(null, arguments));
-    }
-  };
-redefineLog();
+helpers.redefineLog();
 if (!fs.existsSync(config.tmpDir)){
   fs.mkdirSync(config.tmpDir);
 }
@@ -53,6 +16,8 @@ Object.keys(config.integrate).forEach(function (skypeName) {
 	let slackName = config.integrate[skypeName];
 	config.integrateSlack[slackName] = skypeName;
 });
+config.massChannelsExcluded = [];
+helpers.loadDynamicConfig();
 
 // Skype variables
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -258,17 +223,72 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
       }
     }
     // mass send checking
-    if (fromChannel == config.massSendFromChannel && !message.file) {
+    if (fromChannel == config.massSendFromChannel && !message.file && message.text) {
       let n = 1;
       Object.keys(config.integrate).forEach(function (skypeName) {
         let skypeConversation = "8:" + skypeName;
         setTimeout(sendSkypeMessage, n * config.massPeriod, skypeConversation, message.text + (config.debugSuffixSlack || '') );
         n++;
       });
-
+    }
+    // partial mass send
+    if (fromChannel == config.partialSendFromChannel && !message.file && message.text) {
+      let n = 1;
+      Object.keys(config.integrate).forEach(function (skypeName) {
+        // consider excluded channels
+        if (config.massChannelsExcluded.indexOf(config.integrate[skypeName]) === -1) {
+          // send only if channel is not excluded
+          let skypeConversation = "8:" + skypeName;
+          setTimeout(sendSkypeMessage, n * config.massPeriod, skypeConversation, message.text + (config.debugSuffixSlack || ''));
+          n++;
+        }
+      });
+    }
+    // config channel processing
+    if (fromChannel == config.configChannel && !message.file && message.text) {
+      var parseCh = function (text) {
+        let i = text.lastIndexOf('|');
+        if (i !== -1) return text.substring(i + 1, text.length - 1); else return '';
+      };
+      if (message.text.indexOf("mass status") === 0) {
+        printExcludedChannels();
+      } else if (message.text.indexOf("exclude reset") === 0) {
+        config.massChannelsExcluded = [];
+        printExcludedChannels();
+      } else if (message.text.indexOf("include <#") === 0) {
+        let channel = parseCh(message.text);
+        if (channel) {
+          var index = config.massChannelsExcluded.indexOf(channel);
+          if (index > -1) config.massChannelsExcluded.splice(index, 1);
+          printExcludedChannels();
+        }
+      } else if (message.text.indexOf("exclude <#") === 0) {
+        let channel = parseCh(message.text);
+        if (channel) {
+          config.massChannelsExcluded.push(channel);
+          printExcludedChannels();
+        }
+      }
     }
   }
 });
+var printExcludedChannels = function () {
+  rtm.sendMessage('Excluded channels from partial mass send: \n' +
+    config.massChannelsExcluded.map(function (channel) {
+      return "#" + channel + ((config.integrateSlack[channel])? "" : " - _doesn't exist!_");
+    })
+      .join('\n'),
+    channelsByName[config.configChannel]
+  );
+  // save changes in file
+  fs.truncate(config.dynamicConfigFile, 0, function() {
+    fs.writeFile(config.dynamicConfigFile, JSON.stringify(config.massChannelsExcluded, null, 2), function (err) {
+      if (err) {
+        return console.error("Error writing dynamic config file: " + err);
+      }
+    });
+  });
+};
 var sendSkypeMessage = function(skypeConversation, text) {
 	console.log('Slack: mass send message to Skype :', skypeConversation);
 	skyweb.sendMessage(skypeConversation, text);
