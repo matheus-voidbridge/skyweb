@@ -429,6 +429,7 @@ skyweb.messagesCallback = function (messages) {
                   return contact.id == skypeName;
                 });
                 if (contactInfo && contactInfo.avatar_url) opt.icon_url = contactInfo.avatar_url;
+                if (contactInfo && contactInfo.display_name) opt.username = contactInfo.display_name;
               }
               slackWeb.chat.postMessage(channelsByName[slackChannel], sentMsg, opt, function(err, res) {
                 if (err) {
