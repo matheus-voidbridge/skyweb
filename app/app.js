@@ -40,6 +40,8 @@ let channelsById = {};		// dictionary of channel names
 let channelsByName = {};	// dictionary of channel ids
 let slackSentMsg = {};
 let skypeSentMsg = {};
+let skypeIdsSentMsg = {};
+let massSendMsgs = {};
 
 let slackChannelsReading = {}; // last read time by slack channel
 let skypeChatReading = {}; // last read time by skype conversation
@@ -89,6 +91,7 @@ console.log('Slack: RTM init...');
 var rtm = new RtmClient(token, { logLevel: 'info' });
 rtm.start();
 var slackWeb = new WebClient(token);
+var slackWebMe = new WebClient(tokenMe);
 var rtmMe = new RtmClient(tokenMe, { logLevel: 'info' });
 rtmMe.start();
 // The client will emit an RTM.AUTHENTICATED event on successful connection, with the `rtm.start` payload
@@ -203,13 +206,22 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
             storeMsg(skypeSentMsg, skypeName, message.file.name, 'file');
           });
         });
-      } else if (message.subtype == "message_changed") {
-        // slack message removed
-        console.log("Slack: message changed: ", JSON.stringify(message, null, 2));
-      } else if (message.subtype == "message_deleted") {
-        // slack message removed
-        console.log("Slack: message removed: ", JSON.stringify(message, null, 2));
-      } else {
+      } else if (message.subtype == "message_changed" || message.subtype == "message_deleted") {
+        // slack message removed or changed
+        console.log("Slack: " + message.subtype, JSON.stringify(message, null, 2));
+        if (message.previous_message && message.previous_message.ts) {
+          let oldMsg = findMsgById(skypeIdsSentMsg[skypeName], message.previous_message.ts);
+          if (oldMsg && oldMsg.msg) {
+            console.log("Slack: CHANGING/Removing message on skype, id=", oldMsg.msg.skypeId);
+            let newMsg = '';
+            if (message.subtype == "message_changed")
+              if (message.message && message.message.text) newMsg = message.message.text; else return;
+            skyweb.sendMessage(skypeConversation, newMsg, '', '', oldMsg.msg.skypeId);
+            // store sent message
+            storeMsg(skypeSentMsg, skypeName, newMsg);
+          }
+        }
+      } else {  // Usual text message
         // mute skype bot sent messages
         if (hasMsg(slackSentMsg[fromChannel], message.text) ||
             hasMsg(slackSentMsg[fromChannel], getOrigMsgWithTags(message.text))
@@ -220,32 +232,58 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
         // resend
         console.log('Slack: redirect message to Skype :', skypeConversation);
         let msg = message.text + (config.debugSuffixSlack || '');
-        skyweb.sendMessage(skypeConversation, msg);
+        let skypeMsgId = skyweb.sendMessage(skypeConversation, msg);
         // store sent messages
         storeMsg(skypeSentMsg, skypeName, msg);
+        // store msg Id   // use another similar array
+        storeMsg(skypeIdsSentMsg, skypeName, {
+          'id': message.ts,
+          'skypeId': skypeMsgId
+        }, 'ids');
       }
     }
     // mass send checking
     if (fromChannel == config.massSendFromChannel && !message.file && message.text) {
       let n = 1;
-      Object.keys(config.integrate).forEach(function (skypeName) {
-        let skypeConversation = "8:" + skypeName;
-        setTimeout(sendSkypeMessage, n * config.massPeriod, skypeConversation, message.text + (config.debugSuffixSlack || '') );
+      // TODO: clean sendMassMessage associative array?
+      Object.keys(config.integrateSlack).forEach(function (channel) {
+        setTimeout(sendMassMessage, n * config.massPeriod,
+          channelsByName[channel], message.text + (config.debugSuffixSlack || ''), message.ts);
         n++;
       });
     }
     // partial mass send
     if (fromChannel == config.partialSendFromChannel && !message.file && message.text) {
       let n = 1;
-      Object.keys(config.integrate).forEach(function (skypeName) {
+      Object.keys(config.integrateSlack).forEach(function (channel) {
         // consider excluded channels
-        if (config.massChannelsExcluded.indexOf(config.integrate[skypeName]) === -1) {
+        if (config.massChannelsExcluded.indexOf(channel) === -1) {
           // send only if channel is not excluded
-          let skypeConversation = "8:" + skypeName;
-          setTimeout(sendSkypeMessage, n * config.massPeriod, skypeConversation, message.text + (config.debugSuffixSlack || ''));
+          setTimeout(sendMassMessage, n * config.massPeriod,
+            channelsByName[channel], message.text + (config.debugSuffixSlack || ''), message.ts);
           n++;
         }
       });
+    }
+    if ((fromChannel == config.massSendFromChannel || fromChannel == config.partialSendFromChannel) &&
+      (message.subtype == "message_changed" || message.subtype == "message_deleted")) {
+      // mass message changing or removing
+      console.log("Mass send " + message.subtype);
+      if (message.previous_message && message.previous_message.ts) {
+        if (massSendMsgs[message.previous_message.ts]) {
+          massSendMsgs[message.previous_message.ts].forEach(function (msgInfo) {
+            if (msgInfo && msgInfo.msg) {
+              if (message.subtype == "message_changed") {
+                let newMsg = '';
+                if (message.message && message.message.text) newMsg = message.message.text; else return;
+                slackWebMe.chat.update(msgInfo.msg.id, msgInfo.msg.channel, newMsg);
+              } else {
+                slackWebMe.chat.delete(msgInfo.msg.id, msgInfo.msg.channel);
+              }
+            }
+          })
+        }
+      }
     }
     // config channel processing
     if (fromChannel == config.configChannel && !message.file && message.text) {
@@ -295,6 +333,18 @@ var printExcludedChannels = function () {
 var sendSkypeMessage = function(skypeConversation, text) {
 	console.log('Slack: mass send message to Skype :', skypeConversation);
 	skyweb.sendMessage(skypeConversation, text);
+};
+var sendMassMessage = function(channel, text, massMsgId) {
+  console.log('Slack: mass send message to channel :', channelsById[channel]);
+  rtmMe.sendMessage(text, channel, function (err, resp) {
+    if (resp && resp.ts) {
+      // store msg Id  of that mass sending session
+      storeMsg(massSendMsgs, massMsgId, {
+        'id': resp.ts,
+        'channel': channel
+      }, 'ids');
+    }
+  });
 };
 var getOrigMsgWithTags = function(msg) {
   return (msg)? msg.replace(/&lt;/g, '<').replace(/&gt;/g, '>') : '';
@@ -390,7 +440,7 @@ skyweb.messagesCallback = function (messages) {
             } else {
               rtm.sendMessage(sentMsg, channelsByName[slackChannel]);
             }
-            // don't store sent messages
+            // don't store sent messages for duplicate skipping
           }
 				}
 			} else {
@@ -537,6 +587,8 @@ var cleanMsg = function(arr) {
 		    arr.splice(i--, 1);
     } else if (arr[i].type == 'file' && now - arr[i].time > config.muteFileTimeout) {
       arr.splice(i--, 1);
+    } else if (arr[i].type == 'ids' && now - arr[i].time > config.removeTimeout) {
+      arr.splice(i--, 1);
     }
 	}
 };
@@ -549,5 +601,12 @@ var hasMsg = function(arr, msg, type) {
 		return (elem !== '' && elem.type == type && elem.msg === msg);
 	});
 };
-
+var findMsgById = function(arr, id) {
+  if (!arr) return false;
+  cleanMsg(arr);
+  //console.log("look in arr: ", arr, "msg: ", msg);
+  return arr.find( function(elem) {
+    return (elem && elem.type == 'ids' && elem.msg && elem.msg.id == id);
+  });
+};
 

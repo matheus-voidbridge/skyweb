@@ -17,7 +17,7 @@ declare class Skyweb {
     private pollObj;
     constructor();
     login(username: any, password: any): Promise<{}>;
-    sendMessage(conversationId: string, message: string, messagetype?: string, contenttype?: string): void;
+    sendMessage(conversationId: string, message: string, messagetype?: string, contenttype?: string, changeMsgId?: string): string;
     logout(callback?: any): void;
     markConversation(conversationId: string, tsStart: any, tsEnd: any): void;
     getContent(url: string, filename: string, callback: any): void;

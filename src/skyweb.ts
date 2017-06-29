@@ -56,8 +56,8 @@ class Skyweb {
         });
     }
 
-    sendMessage(conversationId: string, message: string, messagetype?: string, contenttype?: string) {
-        this.messageService.sendMessage(this.skypeAccount, conversationId, message, messagetype, contenttype);
+    sendMessage(conversationId: string, message: string, messagetype?: string, contenttype?: string, changeMsgId?: string): string {
+        return this.messageService.sendMessage(this.skypeAccount, conversationId, message, messagetype, contenttype, changeMsgId);
     }
 
     logout(callback?: any) {

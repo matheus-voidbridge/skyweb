@@ -36,8 +36,8 @@ var Skyweb = (function () {
             return skypeAccount;
         });
     };
-    Skyweb.prototype.sendMessage = function (conversationId, message, messagetype, contenttype) {
-        this.messageService.sendMessage(this.skypeAccount, conversationId, message, messagetype, contenttype);
+    Skyweb.prototype.sendMessage = function (conversationId, message, messagetype, contenttype, changeMsgId) {
+        return this.messageService.sendMessage(this.skypeAccount, conversationId, message, messagetype, contenttype, changeMsgId);
     };
     Skyweb.prototype.logout = function (callback) {
         var me = this;

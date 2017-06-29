@@ -17,15 +17,17 @@ export class MessageService {
         this.eventEmitter = eventEmitter;
     }
 
-    public sendMessage(skypeAccount:SkypeAccount, conversationId:string, message:string, messagetype?:string, contenttype?:string) {
-        var requestBody = JSON.stringify({
-            'clientmessageid': Utils.getCurrentTime() + '', // // have the ability to modify text(content) of the message.)
+    public sendMessage(skypeAccount:SkypeAccount, conversationId:string, message:string, messagetype?:string, contenttype?:string, changeMsgId?: string): string {
+        let clientmessageid = changeMsgId || (Math.floor(Utils.getCurrentTime() * 1000) + '');
+        var requestBody:any = {
             'content': message,
             'messagetype': messagetype || 'RichText',
             'contenttype': contenttype || 'text'
-        });
+        };
+        if (changeMsgId) requestBody['skypeeditedid'] = changeMsgId;
+        else requestBody['clientmessageid'] = clientmessageid;
         this.requestWithJar.post(Consts.SKYPEWEB_HTTPS + skypeAccount.messagesHost + '/v1/users/ME/conversations/' + conversationId + '/messages', {
-            body: requestBody,
+            body: JSON.stringify(requestBody),
             headers: {
                 'RegistrationToken': skypeAccount.registrationTokenParams.raw
             }
@@ -40,6 +42,7 @@ export class MessageService {
                 );
             }
         });
+        return clientmessageid;
     }
 
     public markConversation(skypeAccount:SkypeAccount, conversationId:string, tsStart:any, tsEnd:any) {

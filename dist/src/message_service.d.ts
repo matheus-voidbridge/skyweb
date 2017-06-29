@@ -5,7 +5,7 @@ export declare class MessageService {
     private requestWithJar;
     private eventEmitter;
     constructor(cookieJar: CookieJar, eventEmitter: EventEmitter);
-    sendMessage(skypeAccount: SkypeAccount, conversationId: string, message: string, messagetype?: string, contenttype?: string): void;
+    sendMessage(skypeAccount: SkypeAccount, conversationId: string, message: string, messagetype?: string, contenttype?: string, changeMsgId?: string): string;
     markConversation(skypeAccount: SkypeAccount, conversationId: string, tsStart: any, tsEnd: any): void;
     getContent(skypeAccount: SkypeAccount, url: string, filename: string, callback?: any): void;
     createAsmObjectId(skypeAccount: SkypeAccount, filename: string, send_to: string, callback?: any): void;

@@ -10,16 +10,20 @@ var MessageService = (function () {
         this.requestWithJar = request.defaults({ jar: cookieJar });
         this.eventEmitter = eventEmitter;
     }
-    MessageService.prototype.sendMessage = function (skypeAccount, conversationId, message, messagetype, contenttype) {
+    MessageService.prototype.sendMessage = function (skypeAccount, conversationId, message, messagetype, contenttype, changeMsgId) {
         var _this = this;
-        var requestBody = JSON.stringify({
-            'clientmessageid': utils_1.default.getCurrentTime() + '',
+        var clientmessageid = changeMsgId || (Math.floor(utils_1.default.getCurrentTime() * 1000) + '');
+        var requestBody = {
             'content': message,
             'messagetype': messagetype || 'RichText',
             'contenttype': contenttype || 'text'
-        });
+        };
+        if (changeMsgId)
+            requestBody['skypeeditedid'] = changeMsgId;
+        else
+            requestBody['clientmessageid'] = clientmessageid;
         this.requestWithJar.post(Consts.SKYPEWEB_HTTPS + skypeAccount.messagesHost + '/v1/users/ME/conversations/' + conversationId + '/messages', {
-            body: requestBody,
+            body: JSON.stringify(requestBody),
             headers: {
                 'RegistrationToken': skypeAccount.registrationTokenParams.raw
             }
@@ -33,6 +37,7 @@ var MessageService = (function () {
                     '.\n Body: ' + body);
             }
         });
+        return clientmessageid;
     };
     MessageService.prototype.markConversation = function (skypeAccount, conversationId, tsStart, tsEnd) {
         var requestBody = JSON.stringify({
