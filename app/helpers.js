@@ -228,8 +228,8 @@ var HelperMethods = {
 
   savePrintIntegrate: function (addStr) {
     if (addStr === undefined) addStr = ''; else console.log(addStr);
-    this.saveIntegrateConfig();
     this.updateIntegrateChannels();
+    this.saveIntegrateConfig();
 
     var list = Object.keys(config.integrate).map(function (skypeName) {
       let channelName = config.channelsById[config.integrate[skypeName]];
