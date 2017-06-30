@@ -1,6 +1,7 @@
 app/config.dev.js
 app/config.js
 app/config.dynamic.json
+app/config.integrate.json
 app/log
 
 ### Dependencies ###

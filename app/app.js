@@ -11,12 +11,9 @@ if (!fs.existsSync(config.tmpDir)){
   fs.mkdirSync(config.tmpDir);
 }
 
-config.integrateSlack = {};
-Object.keys(config.integrate).forEach(function (skypeName) {
-	let slackName = config.integrate[skypeName];
-	config.integrateSlack[slackName] = skypeName;
-});
-config.massChannelsExcluded = [];
+// load channels list
+var integrateLoaded = helpers.loadIntegrateConfig();
+config.massSomeChannels = [];
 helpers.loadDynamicConfig();
 
 // Skype variables
@@ -36,8 +33,10 @@ var CLIENT_EVENTS = require('@slack/client').CLIENT_EVENTS;
 var token = config.slack_ApiToken;
 var tokenMe = config.slack_MeApiToken;
 
-let channelsById = {};		// dictionary of channel names
-let channelsByName = {};	// dictionary of channel ids
+config.channelsById = {};
+config.channelsByName = {};
+let channelsById = config.channelsById;		  // dictionary of channel names
+let channelsByName = config.channelsByName;	// dictionary of channel ids
 let slackSentMsg = {};
 let skypeSentMsg = {};
 let skypeIdsSentMsg = {};
@@ -103,6 +102,8 @@ rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
 	channelsByName[c.name] = c.id;
   }
   console.log("====== END OF Slack Channels LIST =================== ");
+  // reverse integrate list to slack
+  helpers.updateIntegrateChannels();
   console.log(`Slack: Logged in as  ${rtmStartData.self.name}  of team  ${rtmStartData.team.name} , but not yet connected to a channel`);
 
   //
@@ -178,20 +179,21 @@ var rtmMarkChannel = function (token, channel, timestamp) {
 // Slack message listener
 rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
   if (message) {
-    let fromChannel = channelsById[message.channel];
+    let channelId = message.channel;
+    let fromChannel = channelsById[channelId];
     //console.log('--Slack client receive message:' + JSON.stringify(message, null, 2));
     if (message.subtype == "bot_message") return;
-    console.log('Slack client receive message:', message.text, "; channel_id:", message.channel, " channel:", fromChannel,
+    console.log('Slack client receive message:', message.text, "; channel_id:", channelId, " channel:", fromChannel,
       ((message.subtype)? " subtype: " + message.subtype : "")
     );
     // resend message to skype
-    if (config.integrateSlack[fromChannel]) {
-      let skypeName = config.integrateSlack[fromChannel];
+    if (config.integrateSlack[channelId]) {
+      let skypeName = config.integrateSlack[channelId];
       let skypeConversation = "8:" + skypeName;
 
       if (message.subtype == "file_share" && message.file) {
         // mute skype bot sent messages
-        if (hasMsg(slackSentMsg[fromChannel], message.file.name, 'file')) {
+        if (hasMsg(slackSentMsg[channelId], message.file.name, 'file')) {
           console.log('Slack: mute double file sent from skype.');
           return;
         }
@@ -223,8 +225,8 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
         }
       } else {  // Usual text message
         // mute skype bot sent messages
-        if (hasMsg(slackSentMsg[fromChannel], message.text) ||
-            hasMsg(slackSentMsg[fromChannel], getOrigMsgWithTags(message.text))
+        if (hasMsg(slackSentMsg[channelId], message.text) ||
+            hasMsg(slackSentMsg[channelId], getOrigMsgWithTags(message.text))
           ) {
           console.log('Slack: mute double message sent from skype.');
           return;
@@ -248,7 +250,7 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
       // TODO: clean sendMassMessage associative array?
       Object.keys(config.integrateSlack).forEach(function (channel) {
         setTimeout(sendMassMessage, n * config.massPeriod,
-          channelsByName[channel], message.text + (config.debugSuffixSlack || ''), message.ts);
+          channel, message.text + (config.debugSuffixSlack || ''), message.ts);
         n++;
       });
     }
@@ -257,10 +259,12 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
       let n = 1;
       Object.keys(config.integrateSlack).forEach(function (channel) {
         // consider excluded channels
-        if (config.massChannelsExcluded.indexOf(channel) === -1) {
+        if ((config.partialSendMode == "exclude" && config.massSomeChannels.indexOf(channel) === -1) ||
+            (config.partialSendMode == "include" && config.massSomeChannels.indexOf(channel) > -1))
+          {
           // send only if channel is not excluded
           setTimeout(sendMassMessage, n * config.massPeriod,
-            channelsByName[channel], message.text + (config.debugSuffixSlack || ''), message.ts);
+            channel, message.text + (config.debugSuffixSlack || ''), message.ts);
           n++;
         }
       });
@@ -287,49 +291,12 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
     }
     // config channel processing
     if (fromChannel == config.configChannel && !message.file && message.text) {
-      var parseCh = function (text) {
-        let i = text.lastIndexOf('|');
-        if (i !== -1) return text.substring(i + 1, text.length - 1); else return '';
-      };
-      if (message.text.indexOf("mass status") === 0) {
-        printExcludedChannels();
-      } else if (message.text.indexOf("exclude reset") === 0) {
-        config.massChannelsExcluded = [];
-        printExcludedChannels();
-      } else if (message.text.indexOf("include <#") === 0) {
-        let channel = parseCh(message.text);
-        if (channel) {
-          var index = config.massChannelsExcluded.indexOf(channel);
-          if (index > -1) config.massChannelsExcluded.splice(index, 1);
-          printExcludedChannels();
-        }
-      } else if (message.text.indexOf("exclude <#") === 0) {
-        let channel = parseCh(message.text);
-        if (channel) {
-          config.massChannelsExcluded.push(channel);
-          printExcludedChannels();
-        }
-      }
+      let answer = helpers.processConfigCommands(message.text);
+      rtm.sendMessage(answer, channelsByName[config.configChannel]);
     }
   }
 });
-var printExcludedChannels = function () {
-  rtm.sendMessage('Excluded channels from partial mass send: \n' +
-    config.massChannelsExcluded.map(function (channel) {
-      return "#" + channel + ((config.integrateSlack[channel])? "" : " - _doesn't exist!_");
-    })
-      .join('\n'),
-    channelsByName[config.configChannel]
-  );
-  // save changes in file
-  fs.truncate(config.dynamicConfigFile, 0, function() {
-    fs.writeFile(config.dynamicConfigFile, JSON.stringify(config.massChannelsExcluded, null, 2), function (err) {
-      if (err) {
-        return console.error("Error writing dynamic config file: " + err);
-      }
-    });
-  });
-};
+
 var sendSkypeMessage = function(skypeConversation, text) {
 	console.log('Slack: mass send message to Skype :', skypeConversation);
 	skyweb.sendMessage(skypeConversation, text);
@@ -353,16 +320,16 @@ rtmMe.on(RTM_EVENTS.CHANNEL_MARKED, function handleRtmMessage(message) {
   if (message.channel && message.ts) {
     let fromChannel = channelsById[message.channel];
     let ts = message.ts;
-    if (config.integrateSlack[fromChannel]) {
+    if (config.integrateSlack[message.channel]) {
       // mute?
-      if ((new Date()) - slackChannelsReading[fromChannel] < config.muteTimeout) {
+      if ((new Date()) - slackChannelsReading[message.channel] < config.muteTimeout) {
         console.log('Slack: channel was marked: muted by skype');
         return;
       }
 
-      let skypeName = config.integrateSlack[fromChannel];
+      let skypeName = config.integrateSlack[message.channel];
       let skypeConversation = "8:" + skypeName;
-      console.log('Slack: channel was marked: ', fromChannel, " updating skype conversation: " + skypeConversation);
+      console.log('Slack: channel was marked: #' + fromChannel, " updating skype conversation: " + skypeConversation);
 
       // it's weird that from should be greater to (???)
       let to = Math.floor(new Date() / 1000);
@@ -390,7 +357,7 @@ skyweb.messagesCallback = function (messages) {
 			var conversationLink = message.resource.conversationLink;
 			var conversationId = conversationLink.substring(conversationLink.lastIndexOf('/') + 1);
 			var skypeName = conversationId.substring(conversationId.indexOf(':') + 1);
-      var slackChannel = config.integrate[skypeName];
+      var slackChannel = config.integrate[skypeName]; // channel id
       var msg = message.resource.content;
 			if (message.resource.from.indexOf(username) === -1) {
 				console.log("Skype client receive message from : " + conversationId + "; message: " + msg);
@@ -406,7 +373,7 @@ skyweb.messagesCallback = function (messages) {
             }
             resendSkypeFileMsg(msg, slackChannel, token);
           } else {
-            console.log('Skype: redirect message to Slack :', slackChannel);
+            console.log('Skype: redirect message to Slack :', channelsById[slackChannel]);
             let sentMsg = (msg)? sanitizeHtml(msg) + (config.debugSuffixSkype || '') : '';
             if (message.resource.skypeeditedid) {
               // some message was edited
@@ -431,7 +398,7 @@ skyweb.messagesCallback = function (messages) {
                 if (contactInfo && contactInfo.avatar_url) opt.icon_url = contactInfo.avatar_url;
                 if (contactInfo && contactInfo.display_name) opt.username = contactInfo.display_name;
               }
-              slackWeb.chat.postMessage(channelsByName[slackChannel], sentMsg, opt, function(err, res) {
+              slackWeb.chat.postMessage(slackChannel, sentMsg, opt, function(err, res) {
                 if (err) {
                   console.error('Slack: sent msg error:', err);
                 } else {
@@ -439,7 +406,7 @@ skyweb.messagesCallback = function (messages) {
                 }
               });
             } else {
-              rtm.sendMessage(sentMsg, channelsByName[slackChannel]);
+              rtm.sendMessage(sentMsg, slackChannel);
             }
             // don't store sent messages for duplicate skipping
           }
@@ -467,8 +434,7 @@ skyweb.messagesCallback = function (messages) {
 					  return;
 					}
 
-					let slackChannel = config.integrate[skypeName];
-					console.log('Skype: write same message in Slack  :', slackChannel);
+					console.log('Skype: write same message in Slack  :', channelsById[slackChannel]);
           let sentMsg = (msg)? sanitizeHtml(msg) + (config.debugSuffixSkype || '') : '';
           if (message.resource.skypeeditedid) {
             // some message was edited
@@ -479,7 +445,7 @@ skyweb.messagesCallback = function (messages) {
             }
           }
 
-          rtmMe.sendMessage(sentMsg, channelsByName[slackChannel]);
+          rtmMe.sendMessage(sentMsg, slackChannel);
 					// store sent messages
 					storeMsg(slackSentMsg, slackChannel, sentMsg);
 					//console.log("slackSentMsg: " + JSON.stringify(slackSentMsg, null, 2));
@@ -501,14 +467,15 @@ var skypeReadStatusMessage = function (message) {
       }
 
       var slackChannel = config.integrate[skypeName];
-      console.log("Skype update conversation read state in Slack: skype=" + conversationId, "  slack= #" + slackChannel);
-      rtmMarkChannel(tokenMe, channelsByName[slackChannel]);
+      console.log("Skype update conversation read state in Slack: skype=" + conversationId, "  slack= #" + channelsById[slackChannel]);
+      rtmMarkChannel(tokenMe, slackChannel);
       // remember time of updating slack channel to mute reverse
       slackChannelsReading[slackChannel] = new Date();
     }
   }
 }
 // parse Skype msg, extact file name and send it to Slack
+// @slackChannel is channel id
 function resendSkypeFileMsg(msg, slackChannel, who_post) {
   let isUri = msg.indexOf('uri="') + 5;
   let ieUri = msg.indexOf('"', isUri);
@@ -522,8 +489,8 @@ function resendSkypeFileMsg(msg, slackChannel, who_post) {
       if (result) {
         let originalName = getSkypeOriginalFilename(msg);
 
-        console.log("Skype: resend file to Slack: ", "#" + slackChannel, "  filename: " + originalName);
-        rtmPostFile(filename, originalName, channelsByName[slackChannel], who_post);
+        console.log("Skype: resend file to Slack: ", "#" + channelsById[slackChannel], "  filename: " + originalName);
+        rtmPostFile(filename, originalName, slackChannel, who_post);
         // store sent files
         storeMsg(slackSentMsg, slackChannel, originalName, 'file');
       }
