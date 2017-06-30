@@ -310,6 +310,10 @@ var sendMassMessage = function(channel, text, massMsgId) {
         'id': resp.ts,
         'channel': channel
       }, 'ids');
+      // mark #channel after timeout (need to update in phone)
+      setTimeout(function () {
+        rtmMarkChannel(tokenMe, channel);
+      }, 2000);
     }
   });
 };
