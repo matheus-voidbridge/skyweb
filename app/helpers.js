@@ -219,7 +219,7 @@ var HelperMethods = {
   printSomeChannels : function (addStr) {
     if (addStr === undefined) addStr = ''; else console.log(addStr);
     this.saveDynamicConfig();
-    return 'Some *' + config.partialSendMode + '* channels from partial mass send: \n' +
+    return 'Special list, the following channels are *' + config.partialSendMode + 'd* : \n' +
       config.massSomeChannels.map(function (channel) {
         return "#" + config.channelsById[channel] + ((config.integrateSlack[channel])? "" : " - _doesn't exist!_");
       })
