@@ -147,7 +147,7 @@ var HelperMethods = {
       } else if (parts[0] == "list") {
         return this.savePrintIntegrate("_List of tunnels:_");
       }
-    } else if (parts[1] == "some") {
+    } else if (parts[1] == "spec") {
       if (parts[0] == "add" && parts.length == 3 && channel) {
         // add some #channel
         config.massSomeChannels.push(channel);
@@ -183,11 +183,11 @@ var HelperMethods = {
       "list all\n\n" +
 
       "*Manage partial sending:*\n" +
-      "add some #slack\n" +
-      "del some #slack\n" +
-      "reset some\n" +
-      "list some\n" +
-      "mode some (exclude|include)\n";
+      "add spec #slack\n" +
+      "del spec #slack\n" +
+      "reset spec\n" +
+      "list spec\n" +
+      "mode spec (exclude|include)\n";
     } else {
       return "_unknown command_";
     }
