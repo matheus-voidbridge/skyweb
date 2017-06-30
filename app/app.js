@@ -313,7 +313,7 @@ var sendMassMessage = function(channel, text, massMsgId) {
       // mark #channel after timeout (need to update in phone)
       setTimeout(function () {
         rtmMarkChannel(tokenMe, channel);
-      }, 2000);
+      }, config.markWaitTimeout);
     }
   });
 };
@@ -449,7 +449,12 @@ skyweb.messagesCallback = function (messages) {
             }
           }
 
-          rtmMe.sendMessage(sentMsg, slackChannel);
+          rtmMe.sendMessage(sentMsg, slackChannel, function (err, msg) {
+            // mark #channel after timeout (need to update in phone)
+            setTimeout(function () {
+              rtmMarkChannel(tokenMe, slackChannel);
+            }, config.markWaitTimeout);
+          });
 					// store sent messages
 					storeMsg(slackSentMsg, slackChannel, sentMsg);
 					//console.log("slackSentMsg: " + JSON.stringify(slackSentMsg, null, 2));
