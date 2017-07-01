@@ -232,8 +232,12 @@ var HelperMethods = {
     this.saveIntegrateConfig();
 
     var list = Object.keys(config.integrate).map(function (skypeName) {
+      let contactInfo = config.skyweb.contactsService.contacts.find(function (contact) {
+        return contact.id == skypeName;
+      });
+      let warningStr = (!contactInfo)? " - *can't find this skype contact*" : "";
       let channelName = config.channelsById[config.integrate[skypeName]];
-      return skypeName + " <--> #" + (channelName || config.integrate[skypeName]);
+      return skypeName + " <--> #" + (channelName || config.integrate[skypeName]) + warningStr;
     }).join('\n');;
 
     return addStr + '\n' + list;

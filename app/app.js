@@ -47,6 +47,7 @@ let skypeChatReading = {}; // last read time by skype conversation
 
 // Skype login
 var skyweb = new Skyweb();
+config.skyweb = skyweb;
 var errorCount = 0;
 var skywebLogin = function() {
   skyweb.login(username, password).then(function (skypeAccount) {
