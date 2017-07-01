@@ -223,7 +223,7 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
             storeMsg(skypeSentMsg, skypeName, newMsg);
           }
         }
-      } else {  // Usual text message
+      } else if (!message.subtype) {  // Usual text message
         // mute skype bot sent messages
         if (hasMsg(slackSentMsg[channelId], message.text) ||
             hasMsg(slackSentMsg[channelId], getOrigMsgWithTags(message.text))
@@ -245,7 +245,7 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
       }
     }
     // mass send checking
-    if (fromChannel == config.massSendFromChannel && !message.file && message.text) {
+    if (fromChannel == config.massSendFromChannel && !message.file && !message.subtype && message.text) {
       let n = 1;
       // TODO: clean sendMassMessage associative array?
       Object.keys(config.integrateSlack).forEach(function (channel) {
@@ -255,7 +255,7 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
       });
     }
     // partial mass send
-    if (fromChannel == config.partialSendFromChannel && !message.file && message.text) {
+    if (fromChannel == config.partialSendFromChannel && !message.file && !message.subtype && message.text) {
       let n = 1;
       Object.keys(config.integrateSlack).forEach(function (channel) {
         // consider excluded channels

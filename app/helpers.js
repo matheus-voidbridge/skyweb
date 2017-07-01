@@ -119,7 +119,7 @@ var HelperMethods = {
     let parts = command.trim().toLowerCase().split(' ');
     //console.log(parts, channel);
     if (parts[1] == "all") {
-      if ((parts[0] == "add" || parts[0] == "changed") && parts.length == 4 && channel) {
+      if ((parts[0] == "add" || parts[0] == "change") && parts.length == 4 && channel) {
         // (add|change) all (skype|#slack) (#slack|skype)
         let sky = (parts[3].indexOf('<#') == 0)? 2 : 3;
         let action = (config.integrate[parts[sky]])? "changed" : "added";
