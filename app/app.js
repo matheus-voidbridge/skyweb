@@ -535,6 +535,11 @@ var errorListener = function (eventName, error) {
     skywebRelogin();
 
     errorCount++;
+    if (errorCount === 4) {
+      // exit on errors to run again
+      process.exit(2);
+      console.log("\n==== TERMINATE DUE TO SKYPE ERRORS. ====\n");
+    }
     if (errorCount === 10) {
         console.error("Skype: Removing error listener");
         skyweb.un('error', errorListener);
