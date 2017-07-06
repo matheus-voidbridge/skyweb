@@ -91,6 +91,7 @@ console.log('Slack: RTM init...');
 var rtm = new RtmClient(token, { logLevel: 'info' });
 rtm.start();
 var slackWeb = new WebClient(token);
+config.slackWeb = slackWeb;
 var slackWebMe = new WebClient(tokenMe);
 var rtmMe = new RtmClient(tokenMe, { logLevel: 'info' });
 rtmMe.start();
@@ -98,9 +99,9 @@ rtmMe.start();
 rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
   console.log("====== Slack Channels LIST =================== ");
   for (const c of rtmStartData.channels) {
-	console.log("Channel: ", c.name, " id: ", c.id);
-	channelsById[c.id] = c.name;
-	channelsByName[c.name] = c.id;
+    console.log("Channel: ", c.name, " id: ", c.id);
+    channelsById[c.id] = c.name;
+    channelsByName[c.name] = c.id;
   }
   console.log("====== END OF Slack Channels LIST =================== ");
   // reverse integrate list to slack
@@ -224,6 +225,9 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
             storeMsg(skypeSentMsg, skypeName, newMsg);
           }
         }
+      } else if (message.subtype == "channel_name" || message.subtype == "channel_join") {
+        // update channels list
+        helpers.updateChannelsList();
       } else if (!message.subtype) {  // Usual text message
         // mute skype bot sent messages
         if (hasMsg(slackSentMsg[channelId], message.text) ||

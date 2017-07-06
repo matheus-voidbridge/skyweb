@@ -175,6 +175,8 @@ var HelperMethods = {
           return this.printSomeChannels("_mode changed_");
         }
       }
+    } else if (parts[0] == "update") {
+      return this.updateChannelsList();
     } else if (parts[0] == "help") {
       return "*Manage tunnels:*\n" +
       "add all skype #slack\n" +
@@ -187,7 +189,12 @@ var HelperMethods = {
       "del spec #slack\n" +
       "reset spec\n" +
       "list spec\n" +
-      "mode spec (exclude|include)\n";
+      "mode spec (exclude|include)\n\n" +
+
+      "*System things:*\n" +
+      "update\n" +
+      "restart\n"
+        ;
     } else {
       return "_unknown command_";
     }
@@ -241,6 +248,24 @@ var HelperMethods = {
     }).join('\n');;
 
     return addStr + '\n' + list;
+  },
+
+  updateChannelsList: function () {
+    console.log("Slack: updating channels list.");
+    config.slackWeb.channels.list(function(err, info) {
+      if (err) {
+        console.log('Slack: update channels list Error:', err);
+        config.slackWeb.chat.postMessage(config.channelsByName[config.configChannel], 'Slack: update channels list Error.');
+      } else if (info && info.channels) {
+        for (const c of info.channels) {
+          console.log("Channel: ", c.name, " id: ", c.id);
+          config.channelsById[c.id] = c.name;
+          config.channelsByName[c.name] = c.id;
+        }
+        config.slackWeb.chat.postMessage(config.channelsByName[config.configChannel], "Channels list has been updated successfully.");
+      }
+    });
+    return "updating...";
   }
 
 };
