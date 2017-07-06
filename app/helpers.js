@@ -177,6 +177,8 @@ var HelperMethods = {
       }
     } else if (parts[0] == "update") {
       return this.updateChannelsList();
+    } else if (parts[0] == "restart") {
+      process.exit(1);
     } else if (parts[0] == "help") {
       return "*Manage tunnels:*\n" +
       "add all skype #slack\n" +
