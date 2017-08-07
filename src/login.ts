@@ -40,7 +40,8 @@ export class Login {
     public doLogout(callback?: any) {
         this.requestWithJar.get(Consts.SKYPEWEB_LOGOUT_URL, (error: Error, response: any, body: any) => {
             if (error) {
-                console.log("logout failed");
+                console.error("Skype logout failed");
+                if (callback) callback(false);
                 //rejectWithError(reject, 'logout failed.');
             } else {
                 //console.log(body);

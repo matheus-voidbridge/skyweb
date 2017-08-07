@@ -17,7 +17,7 @@ export class MessageService {
         this.eventEmitter = eventEmitter;
     }
 
-    public sendMessage(skypeAccount:SkypeAccount, conversationId:string, message:string, messagetype?:string, contenttype?:string, changeMsgId?: string): string {
+    public sendMessage(skypeAccount:SkypeAccount, conversationId:string, message:string, messagetype?:string, contenttype?:string, changeMsgId?: string, callback?: any): string {
         let clientmessageid = changeMsgId || (Math.floor(Utils.getCurrentTime() * 1000) + '');
         var requestBody:any = {
             'content': message,
@@ -34,6 +34,7 @@ export class MessageService {
         }, (error:any, response:http.IncomingMessage, body:any) => {
             if (!error && response.statusCode === 201) {
                 //fixme? send success callback?
+                if (callback) callback(clientmessageid, true);
             } else {
                 this.eventEmitter.fire('error', 'Failed to send message.' +
                     '.\n Error code: ' + response.statusCode +
@@ -45,7 +46,7 @@ export class MessageService {
         return clientmessageid;
     }
 
-    public markConversation(skypeAccount:SkypeAccount, conversationId:string, tsStart:any, tsEnd:any) {
+    public markConversation(skypeAccount:SkypeAccount, conversationId:string, tsStart:any, tsEnd:any, callback?: any) {
         var requestBody = JSON.stringify({
             'consumptionhorizon': tsStart + ';' + tsEnd + ';' + (tsStart+300) //'8626535328339004456',
         });
@@ -58,6 +59,7 @@ export class MessageService {
         }, (error:any, response:http.IncomingMessage, body:any) => {
             if (!error && response.statusCode === 200) {
                 console.log("Skype conversation was marked as read.");
+                if (callback) callback(true);
             } else {
                 console.error('Failed to send message.' +
                     '.\n Error code: ' + response.statusCode +

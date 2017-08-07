@@ -31,7 +31,9 @@ var Login = (function () {
         var _this = this;
         this.requestWithJar.get(Consts.SKYPEWEB_LOGOUT_URL, function (error, response, body) {
             if (error) {
-                console.log("logout failed");
+                console.error("Skype logout failed");
+                if (callback)
+                    callback(false);
             }
             else {
                 _this.cookieJar = _this.requestWithJar.jar();

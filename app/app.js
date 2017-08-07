@@ -87,6 +87,7 @@ var skywebRelogin = function () {
 };
 
 // Slack RTM login
+console.log('\n============ APP HAS BEEN STARTED =====================\n');
 console.log('Slack: RTM init...');
 var rtm = new RtmClient(token, { logLevel: 'info' });
 rtm.start();
@@ -220,9 +221,10 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
             let newMsg = '';
             if (message.subtype == "message_changed")
               if (message.message && message.message.text) newMsg = message.message.text; else return;
-            skyweb.sendMessage(skypeConversation, newMsg, '', '', oldMsg.msg.skypeId);
-            // store sent message
-            storeMsg(skypeSentMsg, skypeName, newMsg);
+            skyweb.sendMessage(skypeConversation, newMsg, '', '', oldMsg.msg.skypeId, function (msgId, result) {
+              // store sent message
+              storeMsg(skypeSentMsg, skypeName, newMsg);
+            });
           }
         }
       } else if (message.subtype == "channel_name" || message.subtype == "channel_join") {
@@ -239,14 +241,17 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
         // resend
         console.log('Slack: redirect message to Skype :', skypeConversation);
         let msg = message.text + (config.debugSuffixSlack || '');
-        let skypeMsgId = skyweb.sendMessage(skypeConversation, msg);
-        // store sent messages
-        storeMsg(skypeSentMsg, skypeName, msg);
-        // store msg Id   // use another similar array
-        storeMsg(skypeIdsSentMsg, skypeName, {
-          'id': message.ts,
-          'skypeId': skypeMsgId
-        }, 'ids');
+        skyweb.sendMessage(skypeConversation, msg, undefined, undefined, undefined, function (skypeMsgId, result) {
+          //console.log("Skype message was sent, ", skypeMsgId);
+          // store sent messages
+          storeMsg(skypeSentMsg, skypeName, msg);
+          // store msg Id   // use another similar array
+          storeMsg(skypeIdsSentMsg, skypeName, {
+            'id': message.ts,
+            'skypeId': skypeMsgId
+          }, 'ids');
+
+        });
       }
     }
     // mass send checking
@@ -343,10 +348,10 @@ rtmMe.on(RTM_EVENTS.CHANNEL_MARKED, function handleRtmMessage(message) {
       // it's weird that from should be greater to (???)
       let to = Math.floor(new Date() / 1000);
       let from = (to + 60*60*24);
-      skyweb.markConversation(skypeConversation, from*1000,  to*1000);
-
-      // remember time of updating slack channel to mute reverse
-      skypeChatReading[skypeName] = new Date();
+      skyweb.markConversation(skypeConversation, from*1000,  to*1000, function (result) {
+        // remember time of updating slack channel to mute reverse
+        skypeChatReading[skypeName] = new Date();
+      });
     }
   }
 });

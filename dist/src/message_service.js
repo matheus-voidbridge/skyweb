@@ -10,7 +10,7 @@ var MessageService = (function () {
         this.requestWithJar = request.defaults({ jar: cookieJar });
         this.eventEmitter = eventEmitter;
     }
-    MessageService.prototype.sendMessage = function (skypeAccount, conversationId, message, messagetype, contenttype, changeMsgId) {
+    MessageService.prototype.sendMessage = function (skypeAccount, conversationId, message, messagetype, contenttype, changeMsgId, callback) {
         var _this = this;
         var clientmessageid = changeMsgId || (Math.floor(utils_1.default.getCurrentTime() * 1000) + '');
         var requestBody = {
@@ -29,6 +29,8 @@ var MessageService = (function () {
             }
         }, function (error, response, body) {
             if (!error && response.statusCode === 201) {
+                if (callback)
+                    callback(clientmessageid, true);
             }
             else {
                 _this.eventEmitter.fire('error', 'Failed to send message.' +
@@ -39,7 +41,7 @@ var MessageService = (function () {
         });
         return clientmessageid;
     };
-    MessageService.prototype.markConversation = function (skypeAccount, conversationId, tsStart, tsEnd) {
+    MessageService.prototype.markConversation = function (skypeAccount, conversationId, tsStart, tsEnd, callback) {
         var requestBody = JSON.stringify({
             'consumptionhorizon': tsStart + ';' + tsEnd + ';' + (tsStart + 300)
         });
@@ -52,6 +54,8 @@ var MessageService = (function () {
         }, function (error, response, body) {
             if (!error && response.statusCode === 200) {
                 console.log("Skype conversation was marked as read.");
+                if (callback)
+                    callback(true);
             }
             else {
                 console.error('Failed to send message.' +

@@ -30,6 +30,11 @@ class Skyweb {
 
     private pollObj: Poll;
 
+    // if skype client is logout / logging in
+    public loggedOut: any;
+    public lastLogout: Date;     // the date of last logout
+    public retryTimeout: number;
+
     constructor() {
         this.cookieJar = request.jar();
         this.eventEmitter = new EventEmitter();
@@ -39,6 +44,10 @@ class Skyweb {
         this.statusService = new StatusService(this.cookieJar, this.eventEmitter);
         this.requestService = new RequestService(this.cookieJar, this.eventEmitter);
         this.threadService = new ThreadService(this.cookieJar, this.eventEmitter);
+
+        this.loggedOut = true;
+        this.lastLogout = new Date();
+        this.retryTimeout = 1000;
     }
 
     login(username: any, password: any): Promise<{}> {
@@ -52,15 +61,45 @@ class Skyweb {
                     this.messagesCallback(messages);
                 }
             });
+            this.loggedOut = false;
             return skypeAccount;
         });
     }
 
-    sendMessage(conversationId: string, message: string, messagetype?: string, contenttype?: string, changeMsgId?: string): string {
-        return this.messageService.sendMessage(this.skypeAccount, conversationId, message, messagetype, contenttype, changeMsgId);
+    waitForLogIn(callAfterDelay: any, who?: string): boolean {
+        let timeOut = 60000;
+        if (this.loggedOut) {
+            var outTimeMs = (new Date().getTime()) - this.lastLogout.getTime();
+            if (outTimeMs < timeOut) {
+                console.warn(who + ": Wait Skype for relogin, time from logout: " + outTimeMs);
+                if (callAfterDelay) setTimeout(callAfterDelay, this.retryTimeout);
+                return true;
+            } else {
+                // timeout exceeds
+                console.error(who + ": Wait Skype exceeds timeout, time from logout: " + outTimeMs);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    sendMessage(conversationId: string, message: string, messagetype?: string, contenttype?: string, changeMsgId?: string, callback?: any): string {
+        var me = this;
+        if (this.loggedOut) {
+            this.waitForLogIn(function() {
+                    me.sendMessage(conversationId, message, messagetype, contenttype, changeMsgId, callback);
+            }, "sendMessage");
+            return "";
+        }
+
+        return this.messageService.sendMessage(this.skypeAccount, conversationId, message, messagetype, contenttype, changeMsgId, callback);
     }
 
     logout(callback?: any) {
+        // keep logout state
+        this.loggedOut = true;
+        this.lastLogout = new Date();
+
         var me = this;
         new Login(this.cookieJar, this.eventEmitter).doLogout(function (result: any) {
             if (me.pollObj) me.pollObj.stopPolling = true;
@@ -70,15 +109,36 @@ class Skyweb {
         //this.cookieJar = request.jar();
     }
 
-    markConversation(conversationId:string, tsStart:any, tsEnd:any) {
+    markConversation(conversationId:string, tsStart:any, tsEnd:any, callback?: any) {
+        var me = this;
+        if (this.loggedOut) {
+            this.waitForLogIn(function() {
+                me.markConversation(conversationId, tsStart, tsEnd, callback);
+            }, "markConversation");
+            return;
+        }
         this.messageService.markConversation(this.skypeAccount, conversationId, tsStart, tsEnd);
     }
 
     getContent(url: string, filename: string, callback: any) {
+        var me = this;
+        if (this.loggedOut) {
+            this.waitForLogIn(function() {
+                me.getContent(url, filename, callback);
+            }, "getContent");
+            return;
+        }
         this.messageService.getContent(this.skypeAccount, url, filename, callback);
     }
 
     public postFile(filename: string, originalFileName: string, send_to: string, callback?: any) {
+        var me = this;
+        if (this.loggedOut) {
+            this.waitForLogIn(function() {
+                me.postFile(filename, originalFileName, send_to, callback);
+            }, "postFile");
+            return;
+        }
         this.messageService.postFile(this.skypeAccount, filename, originalFileName, send_to, callback);
     }
 

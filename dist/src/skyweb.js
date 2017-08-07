@@ -20,6 +20,9 @@ var Skyweb = (function () {
         this.statusService = new status_service_1.default(this.cookieJar, this.eventEmitter);
         this.requestService = new request_service_1.default(this.cookieJar, this.eventEmitter);
         this.threadService = new thread_service_1.default(this.cookieJar, this.eventEmitter);
+        this.loggedOut = true;
+        this.lastLogout = new Date();
+        this.retryTimeout = 1000;
     }
     Skyweb.prototype.login = function (username, password) {
         var _this = this;
@@ -33,13 +36,40 @@ var Skyweb = (function () {
                     _this.messagesCallback(messages);
                 }
             });
+            _this.loggedOut = false;
             return skypeAccount;
         });
     };
-    Skyweb.prototype.sendMessage = function (conversationId, message, messagetype, contenttype, changeMsgId) {
-        return this.messageService.sendMessage(this.skypeAccount, conversationId, message, messagetype, contenttype, changeMsgId);
+    Skyweb.prototype.waitForLogIn = function (callAfterDelay, who) {
+        var timeOut = 60000;
+        if (this.loggedOut) {
+            var outTimeMs = (new Date().getTime()) - this.lastLogout.getTime();
+            if (outTimeMs < timeOut) {
+                console.warn(who + ": Wait Skype for relogin, time from logout: " + outTimeMs);
+                if (callAfterDelay)
+                    setTimeout(callAfterDelay, this.retryTimeout);
+                return true;
+            }
+            else {
+                console.error(who + ": Wait Skype exceeds timeout, time from logout: " + outTimeMs);
+                return false;
+            }
+        }
+        return true;
+    };
+    Skyweb.prototype.sendMessage = function (conversationId, message, messagetype, contenttype, changeMsgId, callback) {
+        var me = this;
+        if (this.loggedOut) {
+            this.waitForLogIn(function () {
+                me.sendMessage(conversationId, message, messagetype, contenttype, changeMsgId, callback);
+            }, "sendMessage");
+            return "";
+        }
+        return this.messageService.sendMessage(this.skypeAccount, conversationId, message, messagetype, contenttype, changeMsgId, callback);
     };
     Skyweb.prototype.logout = function (callback) {
+        this.loggedOut = true;
+        this.lastLogout = new Date();
         var me = this;
         new login_1.default(this.cookieJar, this.eventEmitter).doLogout(function (result) {
             if (me.pollObj)
@@ -48,13 +78,34 @@ var Skyweb = (function () {
                 callback(result);
         });
     };
-    Skyweb.prototype.markConversation = function (conversationId, tsStart, tsEnd) {
+    Skyweb.prototype.markConversation = function (conversationId, tsStart, tsEnd, callback) {
+        var me = this;
+        if (this.loggedOut) {
+            this.waitForLogIn(function () {
+                me.markConversation(conversationId, tsStart, tsEnd, callback);
+            }, "markConversation");
+            return;
+        }
         this.messageService.markConversation(this.skypeAccount, conversationId, tsStart, tsEnd);
     };
     Skyweb.prototype.getContent = function (url, filename, callback) {
+        var me = this;
+        if (this.loggedOut) {
+            this.waitForLogIn(function () {
+                me.getContent(url, filename, callback);
+            }, "getContent");
+            return;
+        }
         this.messageService.getContent(this.skypeAccount, url, filename, callback);
     };
     Skyweb.prototype.postFile = function (filename, originalFileName, send_to, callback) {
+        var me = this;
+        if (this.loggedOut) {
+            this.waitForLogIn(function () {
+                me.postFile(filename, originalFileName, send_to, callback);
+            }, "postFile");
+            return;
+        }
         this.messageService.postFile(this.skypeAccount, filename, originalFileName, send_to, callback);
     };
     Skyweb.prototype.setStatus = function (status) {

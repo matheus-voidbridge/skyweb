@@ -15,11 +15,15 @@ declare class Skyweb {
     threadService: ThreadService;
     private cookieJar;
     private pollObj;
+    loggedOut: any;
+    lastLogout: Date;
+    retryTimeout: number;
     constructor();
     login(username: any, password: any): Promise<{}>;
-    sendMessage(conversationId: string, message: string, messagetype?: string, contenttype?: string, changeMsgId?: string): string;
+    waitForLogIn(callAfterDelay: any, who?: string): boolean;
+    sendMessage(conversationId: string, message: string, messagetype?: string, contenttype?: string, changeMsgId?: string, callback?: any): string;
     logout(callback?: any): void;
-    markConversation(conversationId: string, tsStart: any, tsEnd: any): void;
+    markConversation(conversationId: string, tsStart: any, tsEnd: any, callback?: any): void;
     getContent(url: string, filename: string, callback: any): void;
     postFile(filename: string, originalFileName: string, send_to: string, callback?: any): void;
     setStatus(status: Status): void;
