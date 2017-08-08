@@ -29,8 +29,6 @@ var MessageService = (function () {
             }
         }, function (error, response, body) {
             if (!error && response.statusCode === 201) {
-                if (callback)
-                    callback(clientmessageid, true);
             }
             else {
                 _this.eventEmitter.fire('error', 'Failed to send message.' +
@@ -39,6 +37,8 @@ var MessageService = (function () {
                     '.\n Body: ' + body);
             }
         });
+        if (callback)
+            callback(clientmessageid, true);
         return clientmessageid;
     };
     MessageService.prototype.markConversation = function (skypeAccount, conversationId, tsStart, tsEnd, callback) {

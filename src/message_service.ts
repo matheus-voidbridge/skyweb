@@ -34,7 +34,7 @@ export class MessageService {
         }, (error:any, response:http.IncomingMessage, body:any) => {
             if (!error && response.statusCode === 201) {
                 //fixme? send success callback?
-                if (callback) callback(clientmessageid, true);
+                // we have removed callback here because occasionally server response goes after real sending of message
             } else {
                 this.eventEmitter.fire('error', 'Failed to send message.' +
                     '.\n Error code: ' + response.statusCode +
@@ -43,6 +43,8 @@ export class MessageService {
                 );
             }
         });
+        // callback is used to notify about message id
+        if (callback) callback(clientmessageid, true);
         return clientmessageid;
     }
 
