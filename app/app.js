@@ -536,8 +536,13 @@ function getSkypeOriginalFilename(msg) {
 var errorListener = function (eventName, error) {
     console.error("Skype: error#" + errorCount + " : Error occured : " + error);
     // TODO: test on error "Failed to poll messages"?
-    // relogin in case of error
-    skywebRelogin();
+    if (!skyweb.loggedOut) {
+      // relogin in case of error
+      skywebRelogin();
+    } else {
+      console.error("Skype: don't relogin again due to logged out state: " + skyweb.loggedOut +
+        "; logout date:" + skyweb.lastLogout);
+    }
 
     errorCount++;
     if (errorCount === 4) {
