@@ -31,6 +31,12 @@ var transformSlack2Skype = function (msg) {
   }
 
   // replace <mailto:info@vidaplayer.com|info@vidaplayer.com>
+  msg = transfromSlackMailto(msg);
+
+  return msg;
+};
+var transfromSlackMailto = function (msg) {
+  // replace <mailto:info@vidaplayer.com|info@vidaplayer.com>
   let iMts = msg.indexOf("<mailto:");
   if (iMts >= 0) { // stars with mailto:
     let iMte = msg.indexOf(">", iMts);
@@ -40,7 +46,6 @@ var transformSlack2Skype = function (msg) {
       msg = msg.substring(0, iMts) + email + msg.substring(iMte + 1);
     }
   }
-
   return msg;
 };
 // replaces emoticons from slack to skype format
@@ -65,4 +70,4 @@ var transformSkype2Slack = function (msg) {
   return sanitizeHtml(msg);
 };
 
-module.exports = { transformSkype2Slack, transformSlack2Skype };
+module.exports = { transformSkype2Slack, transformSlack2Skype, transfromSlackMailto };

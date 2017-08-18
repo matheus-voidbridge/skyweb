@@ -330,7 +330,7 @@ var sendMassMessage = function(channel, text, massMsgId) {
   });
 };
 var getOrigMsgWithTags = function(msg) {
-  return (msg)? msg.replace(/&lt;/g, '<').replace(/&gt;/g, '>') : '';
+  return (msg)? transform.transfromSlackMailto(msg).replace(/&lt;/g, '<').replace(/&gt;/g, '>') : '';
 }
 rtmMe.on(RTM_EVENTS.CHANNEL_MARKED, function handleRtmMessage(message) {
   if (message.channel && message.ts) {
