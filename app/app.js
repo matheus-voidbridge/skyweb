@@ -4,7 +4,8 @@ var config = require('./config');
 var crypto = require('crypto');
 var fs = require('fs');
 var sanitizeHtml = require('sanitize-html');
-var helpers = require('./helpers')
+var helpers = require('./helpers');
+var transform = require('./transform');
 
 helpers.redefineLog();
 if (!fs.existsSync(config.tmpDir)){
@@ -241,7 +242,7 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
         // resend
         console.log('Slack: redirect message to Skype :', skypeConversation);
         let msg = message.text + (config.debugSuffixSlack || '');
-        msg = transformSlack2Skype(msg);
+        msg = transform.transformSlack2Skype(msg);
         skyweb.sendMessage(skypeConversation, msg, undefined, undefined, undefined, function (skypeMsgId, result) {
           //console.log("Skype message was sent, ", skypeMsgId);
           // store sent messages
@@ -356,18 +357,6 @@ rtmMe.on(RTM_EVENTS.CHANNEL_MARKED, function handleRtmMessage(message) {
     }
   }
 });
-// replaces emoticons from slack to skype format
-var transformSlack2Skype = function (msg) {
-  return (msg)?
-    msg.replace(/:slightly_smiling_face:/g, ":)")
-      .replace(/:disappointed:/g, ":(")
-      .replace(/:\+1:/g, "(y)")
-      .replace(/:joy:/g, ":D")
-      .replace(/:grinning:/g, ":D")
-      .replace(/:wink:/g, ";)")
-    : '';
-}
-
 
 // Skype message listener
 skyweb.messagesCallback = function (messages) {
@@ -400,7 +389,7 @@ skyweb.messagesCallback = function (messages) {
             resendSkypeFileMsg(msg, slackChannel, token);
           } else {
             console.log('Skype: redirect message to Slack :', channelsById[slackChannel]);
-            let sentMsg = (msg)? sanitizeHtml(msg) + (config.debugSuffixSkype || '') : '';
+            let sentMsg = (msg)? transform.transformSkype2Slack(msg) + (config.debugSuffixSkype || '') : '';
             if (message.resource.skypeeditedid) {
               // some message was edited
               if (sentMsg) {
@@ -461,7 +450,7 @@ skyweb.messagesCallback = function (messages) {
 					}
 
 					console.log('Skype: write same message in Slack  :', channelsById[slackChannel]);
-          let sentMsg = (msg)? sanitizeHtml(msg) + (config.debugSuffixSkype || '') : '';
+          let sentMsg = (msg)? transform.transformSkype2Slack(msg) + (config.debugSuffixSkype || '') : '';
           if (message.resource.skypeeditedid) {
             // some message was edited
             if (sentMsg) {
