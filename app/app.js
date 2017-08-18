@@ -241,6 +241,7 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
         // resend
         console.log('Slack: redirect message to Skype :', skypeConversation);
         let msg = message.text + (config.debugSuffixSlack || '');
+        msg = transformSlack2Skype(msg);
         skyweb.sendMessage(skypeConversation, msg, undefined, undefined, undefined, function (skypeMsgId, result) {
           //console.log("Skype message was sent, ", skypeMsgId);
           // store sent messages
@@ -355,6 +356,17 @@ rtmMe.on(RTM_EVENTS.CHANNEL_MARKED, function handleRtmMessage(message) {
     }
   }
 });
+// replaces emoticons from slack to skype format
+var transformSlack2Skype = function (msg) {
+  return (msg)?
+    msg.replace(/:slightly_smiling_face:/g, ":)")
+      .replace(/:disappointed:/g, ":(")
+      .replace(/:\+1:/g, "(y)")
+      .replace(/:joy:/g, ":D")
+      .replace(/:grinning:/g, ":D")
+      .replace(/:wink:/g, ";)")
+    : '';
+}
 
 
 // Skype message listener
