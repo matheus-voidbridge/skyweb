@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.MessageService = void 0;
 var request = require("request");
 var Consts = require("./consts");
 var utils_1 = require("./utils");
@@ -86,6 +87,7 @@ var MessageService = (function () {
         });
     };
     MessageService.prototype.createAsmObjectId = function (skypeAccount, filename, send_to, callback) {
+        var _a;
         var _this = this;
         var requestBody = {
             'filename': filename,
@@ -123,7 +125,6 @@ var MessageService = (function () {
                     callback(false);
             }
         });
-        var _a;
     };
     MessageService.prototype.postFile = function (skypeAccount, filename, originalFileName, send_to, callback) {
         var me = this;

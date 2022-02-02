@@ -10,11 +10,11 @@ export declare class Login {
     doLogin(skypeAccount: SkypeAccount): Promise<{}>;
     doLogout(callback?: any): void;
     requestAsmToken(skypeAccount: SkypeAccount, resolve: any, reject: any): void;
-    private sendLoginRequestOauth(skypeAccount, resolve, reject);
-    private promiseSkypeToken(skypeAccount, magicT);
-    private getRegistrationToken(skypeAccount, resolve, reject);
-    private subscribeToResources(skypeAccount, resolve, reject);
-    private createStatusEndpoint(skypeAccount, resolve, reject);
-    private getSelfDisplayName(skypeAccout, resolve, reject);
+    private sendLoginRequestOauth;
+    private promiseSkypeToken;
+    private getRegistrationToken;
+    private subscribeToResources;
+    private createStatusEndpoint;
+    private getSelfDisplayName;
 }
 export default Login;

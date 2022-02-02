@@ -8,6 +8,6 @@ export declare class Poll {
     stopPolling: any;
     constructor(cookieJar: CookieJar, eventEmitter: EventEmitter);
     pollAll(skypeAccount: SkypeAccount, messagesCallback: (messages: Array<any>) => void): void;
-    private static parsePollResult(pollResult, messagesCallback);
+    private static parsePollResult;
 }
 export default Poll;
